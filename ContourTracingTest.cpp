@@ -6,10 +6,12 @@
 
 int main()
 {
+	printf("function %s: %s(%d)\n", __func__, __FILE__, __LINE__);
+
 	std::srand(471142);
 	cv::Mat image(100, 200, CV_8UC1);
-	uchar* stop = &image.ptr()[image.rows * image.cols];
-	for (uchar* p = image.ptr(); p < stop; p++)
+	uint8_t* stop = &image.ptr()[image.rows * image.cols];
+	for (uint8_t* p = image.ptr(); p < stop; p++)
 	{
 		*p = std::rand() < RAND_MAX * 0.75 ? 0 : 255;
 	}
