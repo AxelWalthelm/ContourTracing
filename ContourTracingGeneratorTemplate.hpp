@@ -1,4 +1,8 @@
 #pragma once
+/*
+o__WARNING_CODE_IS_GENERATED__o
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -60,7 +64,7 @@ namespace o__NAMESPACE__o
 		bool clockwise;  // can be derived from start and stop by checking image
 	};
 
-	template<TImage>
+	template<typename TImage>
 	int getClockwiseSign(Edge const& edge, TImage const& image)
 	{
 		/*
@@ -98,13 +102,13 @@ namespace o__NAMESPACE__o
 		}
 	}
 
-	template<TImage>
+	template<typename TImage>
 	void setSeed(SeedInfo& seed, Point foreground, Point background, TImage const& image)
 	{
 		TODO;
 	}
 
-	template<TImage, TContour>
+	template<typename TImage, typename TContour>
 	void findContour(TImage const& image, SeedInfo seed, TContour contour, bool do_suppress_border = false, int max_contour_length = 0)
 	{
 		// image properties
@@ -116,7 +120,7 @@ namespace o__NAMESPACE__o
 
 		const uint8_t* data = image.ptr(0, 0);
 		const int stride = image.ptr(1, 0) - data;
-		o__NAMESPACE__o_Assert((image.ptr(0, 1) - data) == 1, (image.ptr(1, 0) - data) == 1 ? "image is not row-major order" : "pixel is not single byte");
+		o__NAMESPACE__o_Assert(image.ptr(0, 1) - data == 1, (image.ptr(1, 0) - data == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
 		// constants to address 8-connected neighbour pixels
 		constexpr int off_00 = 0;
@@ -140,7 +144,7 @@ namespace o__NAMESPACE__o
 		o__NAMESPACE__o_Assert(getClockwiseSign(seed.start, image) == (is_clockwise ? 1 : -1), "seed start has inconsistent turning direction");
 		o__NAMESPACE__o_Assert(getClockwiseSign(seed.stop, image) == (is_clockwise ? 1 : -1), "seed stop has inconsistent turning direction");
 		int contour_length = 0;
-		if (max_contour_length <= 0)
+		if (max_contour_length <= 0) // TODO
 			max_contour_length = INT_MAX;
 
 		if (is_clockwise)
@@ -149,78 +153,23 @@ namespace o__NAMESPACE__o
 			{
 				if (dir == 0)
 				{
-					/*
-					direction 0 basic clockwise rules:
-					==================================
-
-					                     rule 1:              rule 2:              rule 3:              
-					                     +-------+-------+    +-------+-------+    +-------+-------+    
-					                     |       |       |    |       ^       |    |       |       |    1: foreground
-					                     |   1   |  0/1  |    |   0   |   1   |    |   0   |   0   |    0: background or border
-					                     | (???) |       |    |       | (???) |    |       | (???) |    /: alternative
-					                     +<------+-------+    +-------+-------+    +-------+------>+    
-					                     |       ^       |    |       ^       |    |       ^       |    
-					                     |   0   |   1   |    |   0   |   1   |    |   0   |   1   |    
-					                     |       | (x,y) |    |       | (x,y) |    |       | (x,y) |    
-					                     +-------+-------+    +-------+-------+    +-------+-------+    
-					                     - turn left          - move ahead         - turn right
-					                     - emit pixel (x,y)   - emit pixel (x,y)
-
-
-					direction 0 clockwise rules with border checks:
-					===============================================
-
-					rule 0:              rule 1:              rule 2:              rule 3:              
-					+-------+-------+    +-------+-------+    +-------+-------+    +-------+-------+    
-					|       |       |    |       |       |    |       ^       |    |       |       |    1: foreground
-					|   b   |   b   |    |   1   |  0/1  |    |  0/b  |   1   |    |  0/b  |   0   |    0: background
-					|  ???  |  ???  |    |  ???  |       |    |       |  ???  |    |       |  ???  |    b: border outside of image
-					+-------+------>+    +<------+-------+    +-------+-------+    +-------+------>+    /: alternative
-					|       ^       |    |       ^       |    |       ^       |    |       ^       |    
-					|  0/b  |   1   |    |   0   |   1   |    |  0/b  |   1   |    |  0/b  |   1   |    (x,y): current pixel
-					|       | (x,y) |    |       | (x,y) |    |       | (x,y) |    |       | (x,y) |    (???): pixel to be checked
-					+-------+-------+    +-------+-------+    +-------+-------+    +-------+-------+    
-					=> turn right        => turn left         => move ahead        => turn right
-					                     => emit pixel (x,y)  => emit pixel (x,y)
-
-					*/
-					// if forward is border (rule 0)
-					//     turn right
-					// else if left is not border and forward-left pixel is foreground (rule 1)
-					//     emit current pixel
-					//     go to pixel
-					//     has_in_edge = true
-					//     turn left
-					// else if forward pixel is foreground (rule 2)
-					//     if not do_suppress_border or has_in_edge
-					//         emit current pixel
-					//     go to pixel
-					//     has_in_edge = left is not border
-					// else (rule 3)
-					//     turn right
-					//     if not has_in_edge
-					//         has_in_edge = left is not border
 					o__TRACE_STEP_CW_DIR_0__o;
-					TODO;
 				}
 				else if (dir == 1)
 				{
 					o__TRACE_STEP_CW_DIR_1__o;
-					TODO;
 				}
 				else if (dir == 2)
 				{
 					o__TRACE_STEP_CW_DIR_2__o;
-					TODO;
 				}
 				else
 				{
 					assert(dir == 3);
 					o__TRACE_STEP_CW_DIR_3__o;
-					TODO;
 				}
 			}
-			while ((x != seed.stop.x || y != seed.stop.y || dir != seed.stop.dir) && contour_length < max_contour_length);
+			while ((x != seed.stop.x || y != seed.stop.y || dir != seed.stop.dir));
 		}
 		else
 		{
@@ -229,26 +178,28 @@ namespace o__NAMESPACE__o
 				if (dir == 0)
 				{
 					o__TRACE_STEP_CCW_DIR_0__o;
-					TODO;
 				}
 				else if (dir == 1)
 				{
 					o__TRACE_STEP_CCW_DIR_1__o;
-					TODO;
 				}
 				else if (dir == 2)
 				{
 					o__TRACE_STEP_CCW_DIR_2__o;
-					TODO;
 				}
 				else
 				{
 					assert(dir == 3);
 					o__TRACE_STEP_CCW_DIR_3__o;
-					TODO;
 				}
 			}
-			while ((x != seed.stop.x || y != seed.stop.y || dir != seed.stop.dir) && contour_length < max_contour_length);
+			while ((x != seed.stop.x || y != seed.stop.y || dir != seed.stop.dir));
+		}
+
+		if (contour_length == 0 && contour_length < max_contour_length)
+		{
+			// single isolated pixel
+			contour.emplace_back(x, y);
 		}
 	}
 }
