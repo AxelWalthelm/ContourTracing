@@ -18,26 +18,25 @@ introduction = """
  Fast Edge-Based Pixel Contour Tracing from Seed Point
 =======================================================
 
+TODO
 
+	Definition of direction
+		                            x    
+	+---------------------------------->  
+	|               (0, -1)               
+	|                  0                  
+	|                  ^                  
+	|                  |                  
+	|                  |                  
+	| (-1, 0) 3 <------+------> 1 (1, 0)  
+	|                  |                  
+	|                  |                  
+	|                  v                  
+	|                  2                  
+  y |               (0, 1)                
+	v                                     
 """.strip('\n')
 
-"""
-		   Definition of direction
-		                                   x    
-		  +---------------------------------->  
-		  |               (0, -1)               
-		  |                  0                  
-		  |                  ^                  
-		  |                  |                  
-		  |                  |                  
-		  | (-1, 0) 3 <------+------> 1 (1, 0)  
-		  |                  |                  
-		  |                  |                  
-		  |                  v                  
-		  |                  2                  
-		y |               (0, 1)                
-		  v                                     
-"""
 def vector(dir):
 	return ((0, -1), (1, 0), (0, 1), (-1, 0))[dir]
 
@@ -52,6 +51,9 @@ def is_forward_border_code(dir):
 
 def is_not_forward_border_code(dir):
 	return ('y != 0', 'x != width_m1', 'y != height_m1', 'x != 0')[dir]
+
+def is_forward_border_no_m1_code(dir):
+	return is_forward_border_code(dir).replace("_m1", " - 1")
 
 def is_left_not_border_code(dir, clockwise):
 	return is_not_forward_border_code(left_dir(dir, clockwise))
@@ -74,8 +76,11 @@ def pixel_off_code(vec):
 	sign = {-1: 'm', 0: '0', 1: 'p'}
 	return "off_" + sign[vec[0]] + sign[vec[1]]
 
+def is_value_foreground_code(value_code):
+	return "{} != 0".format(value_code)
+
 def is_pixel_foreground_code(vec):
-	return "pixel[{}] != 0".format(pixel_off_code(vec))
+	return is_value_foreground_code("pixel[{}]".format(pixel_off_code(vec)))
 
 def move_pixel_code_lines(vec, indent):
 	lines = []
@@ -278,6 +283,17 @@ def make_trace_step_code(dir, clockwise, indent):
 	return code
 
 
+def make_trace_generic_comment_code(indent):
+	code = indent + "/*\n"
+	code += make_rules_ascii_art(0, True, indent) + "\n"
+	code += "\n"
+	code += make_rules_code_summary(0, True, indent) + "\n"
+	code += "\n"
+	code += indent + "In case of counterclockwise tracing the rules are the same except that left and right are exchanged.\n"
+	code += indent + "*/"
+	return code
+
+
 if False:
 	for clockwise in (True, False):
 		for dir in range(4):
@@ -294,6 +310,9 @@ lines = (template.replace('o__NAMESPACE__o', namespace)
 				 .replace('o__INTRODUCTION__o', introduction)
 				 .splitlines())
 
+# remove lines which only comment the template or which contain code to pacify syntax checkers
+lines = [l for l in lines if "//o__#__o//" not in l]
+
 for line_index, line in enumerate(lines):
 	m = re.match(r'^(\s*)(.*)o__TRACE_STEP_(C?CW)_DIR_([0-3])__o\s*;\s*(.*)$', line)
 	if m:
@@ -301,6 +320,32 @@ for line_index, line in enumerate(lines):
 		assert not code_before
 		assert not code_after
 		lines[line_index] = make_trace_step_code(int(dir), clockwise == 'CW', indent)
+		continue
+
+	m = re.match(r'^(\s*)(.*)o__TRACE_GENERIC_COMMENT__o\s*;\s*(.*)$', line)
+	if m:
+		indent, code_before, code_after = m.groups()
+		assert not code_before
+		assert not code_after
+		lines[line_index] = make_trace_generic_comment_code(indent)
+		continue
+
+	while True:
+		m = re.match(r'^(.*)o__isValueForeground\(\s*(.*?)\s*\)__o(.*)$', line)
+		if m:
+			code_before, args, code_after = m.groups()
+			line = code_before + is_value_foreground_code(args) + code_after
+			continue
+
+		m = re.match(r'^(.*)o__isForwardBorderDir([0-3])__o(.*)$', line)
+		if m:
+			code_before, dir, code_after = m.groups()
+			line = code_before + is_forward_border_no_m1_code(int(dir)) + code_after
+			continue
+
+		lines[line_index] = line
+		break
+
 
 with open(output_file, 'w') as f:
 	f.write('\n'.join(lines) + '\n')

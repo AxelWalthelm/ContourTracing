@@ -6,8 +6,6 @@
 
 int main()
 {
-	printf("function %s: %s(%d)\n", __func__, __FILE__, __LINE__);
-
 	std::srand(471142);
 	cv::Mat image(100, 200, CV_8UC1);
 	uint8_t* stop = &image.ptr()[image.rows * image.cols];
@@ -15,6 +13,9 @@ int main()
 	{
 		*p = std::rand() < RAND_MAX * 0.75 ? 0 : 255;
 	}
+
+	std::vector<cv::Point> contour;
+	FEPCT::findContour(contour, image, 0, 0, -1, true);
 
 	cv::namedWindow("image", cv::WINDOW_NORMAL);
 	cv::imshow("image", image);
