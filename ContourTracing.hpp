@@ -155,12 +155,26 @@ namespace FEPCT
 		int dir = -1;
 	};
 
-	// TContour needs to implement a small sub-set of std::vector<cv::Point>:
+	// If no direction dir is given (i.e. dir=-1) a direction is chosen automatically,
+	// which usually gives you what you expect, unless the object to trace is very narrow and the
+	// seed pixel is touching the contour twice, in which case tracing will start on the side with the smallest dir.
+	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
+	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
+	// to ensure the resulting contour is consistently 8-connected thin.
+	// The start pixel is always the first pixel in the contour, even if it is on the image border and do_suppress_border=true.
+	// This may seem inconsistent, but analyzing the start pixel for having an edge on the contour which
+	// is not on the image border would complicate the algorithm by having to handle rarely encountered situations
+	// (like, what if the image is only one pixel high?), it would slow down start-up time of contour tracing,
+	// and I have no indication that this would be a relevant use case for anyone. If you do have reason to
+	// choose a start pixel you also want to suppress, maybe you can just ignore it in the resulting contour?
+	//
+	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
 	//     void TContour::emplace_back(int x, int y);
-	// TImage needs to implement a small sub-set of cv::Mat:
-	//     int TImage::rows; // image height
-	//     int TImage::cols; // image width
-	//     uint8_t* TImage::ptr(int row, int col) // get pointer into continuous row-major single channel raster image memory
+	//
+	// TImage needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
+	//     int TImage::rows; // number of rows, i.e. image height
+	//     int TImage::cols; // number of columns, i.e. image width
+	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
 	template<typename TContour, typename TImage>
 	void findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
@@ -265,8 +279,10 @@ namespace FEPCT
 			: upperLimitContourLength(width, height);
 		int contour_length = 0;
 
-		// does current pixel have an edge on contour which is inside of the image, i.e. not only edges at image border
-		bool has_in_edge = !isLeftBorder(x, y, dir, clockwise, width, height);
+		// If do_suppress_border=true is_pixel_valid indicates if the current pixel has an edge
+		// on contour which is inside of the image, i.e. not only edges at image border.
+		// Otherwise it is always true.
+		bool is_pixel_valid = true; // start pixel is always part of contour
 
 		if (max_contour_length > 0)
 		{
@@ -312,16 +328,16 @@ namespace FEPCT
 			else if left is not border and forward-left pixel is foreground (rule 1)
 			    emit current pixel
 			    go to checked pixel
-			    has_in_edge = true
+			    set pixel valid
 			    turn left
 			else if forward pixel is foreground (rule 2)
-			    if not do_suppress_border or has_in_edge
+			    if pixel is valid
 			        emit current pixel
 			    go to checked pixel
-			    has_in_edge = left is not border
+			    if border is to be suppressed, set pixel valid if left is not border
 			else (rule 3)
 			    turn right
-			    has_in_edge = has_in_edge or left is not border
+			    set pixel valid if left is not border
 
 			In case of counterclockwise tracing the rules are the same except that left and right are exchanged.
 			*/
@@ -343,28 +359,29 @@ namespace FEPCT
 
 					moveForward(x, y, dir);
 					moveLeft(x, y, dir, clockwise);
-					has_in_edge = true;
+					is_pixel_valid = true;
 
 					dir = left(dir, clockwise);
 				}
 				// (rule 2)
 				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
 				{
-					if (!do_suppress_border || has_in_edge)
+					if (is_pixel_valid)
 					{
 						contour.emplace_back(x, y);
 					}
 					if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
 						break;
 					moveForward(x, y, dir);
-					has_in_edge = isLeftBorder(x, y, dir, clockwise, width, height);
+					if (do_suppress_border)
+						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 				// (rule 3)
 				else
 				{
 					dir = right(dir, clockwise);
-					if (!has_in_edge)
-						has_in_edge = isLeftBorder(x, y, dir, clockwise, width, height);
+					if (!is_pixel_valid)
+						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 
 			} while (x != stop_x || y != stop_y || dir != stop_dir);
@@ -430,16 +447,16 @@ namespace FEPCT
 						else if left is not border and forward-left pixel is foreground (rule 1)
 						    emit current pixel
 						    go to checked pixel
-						    has_in_edge = true
+						    set pixel valid
 						    turn left
 						else if forward pixel is foreground (rule 2)
-						    if not do_suppress_border or has_in_edge
+						    if pixel is valid
 						        emit current pixel
 						    go to checked pixel
-						    has_in_edge = left is not border
+						    if border is to be suppressed, set pixel valid if left is not border
 						else (rule 3)
 						    turn right
-						    has_in_edge = has_in_edge or left is not border
+						    set pixel valid if left is not border
 						*/
 
 						// if forward is border (rule 0)
@@ -459,16 +476,16 @@ namespace FEPCT
 						    pixel += off_mm;
 						    --x;
 						    --y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn left
 						    dir = 3;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0m] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -478,17 +495,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_0m;
 						    --y;
-						    // has_in_edge = left is not border
-						    has_in_edge = x != 0;
+						    // if border is to be suppressed, set pixel valid if left is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = x != 0;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn right
 						    dir = 1;
-						    // has_in_edge = has_in_edge or left is not border
-						    if (!has_in_edge)
-						        has_in_edge = x != 0;
+						    // set pixel valid if left is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = x != 0;
 						}
 
 					}
@@ -529,16 +547,16 @@ namespace FEPCT
 						    pixel += off_pm;
 						    ++x;
 						    --y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn left
 						    dir = 0;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_p0] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -548,17 +566,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_p0;
 						    ++x;
-						    // has_in_edge = left is not border
-						    has_in_edge = y != 0;
+						    // if border is to be suppressed, set pixel valid if left is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = y != 0;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn right
 						    dir = 2;
-						    // has_in_edge = has_in_edge or left is not border
-						    if (!has_in_edge)
-						        has_in_edge = y != 0;
+						    // set pixel valid if left is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = y != 0;
 						}
 
 					}
@@ -599,16 +618,16 @@ namespace FEPCT
 						    pixel += off_pp;
 						    ++x;
 						    ++y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn left
 						    dir = 1;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0p] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -618,17 +637,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_0p;
 						    ++y;
-						    // has_in_edge = left is not border
-						    has_in_edge = x != width_m1;
+						    // if border is to be suppressed, set pixel valid if left is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = x != width_m1;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn right
 						    dir = 3;
-						    // has_in_edge = has_in_edge or left is not border
-						    if (!has_in_edge)
-						        has_in_edge = x != width_m1;
+						    // set pixel valid if left is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = x != width_m1;
 						}
 
 					}
@@ -670,16 +690,16 @@ namespace FEPCT
 						    pixel += off_mp;
 						    --x;
 						    ++y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn left
 						    dir = 2;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_m0] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -689,17 +709,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_m0;
 						    --x;
-						    // has_in_edge = left is not border
-						    has_in_edge = y != height_m1;
+						    // if border is to be suppressed, set pixel valid if left is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = y != height_m1;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn right
 						    dir = 0;
-						    // has_in_edge = has_in_edge or left is not border
-						    if (!has_in_edge)
-						        has_in_edge = y != height_m1;
+						    // set pixel valid if left is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = y != height_m1;
 						}
 
 					}
@@ -733,16 +754,16 @@ namespace FEPCT
 						else if right is not border and forward-right pixel is foreground (rule 1)
 						    emit current pixel
 						    go to checked pixel
-						    has_in_edge = true
+						    set pixel valid
 						    turn right
 						else if forward pixel is foreground (rule 2)
-						    if not do_suppress_border or has_in_edge
+						    if pixel is valid
 						        emit current pixel
 						    go to checked pixel
-						    has_in_edge = left is not border
+						    if border is to be suppressed, set pixel valid if right is not border
 						else (rule 3)
 						    turn left
-						    has_in_edge = has_in_edge or right is not border
+						    set pixel valid if right is not border
 						*/
 
 						// if forward is border (rule 0)
@@ -762,16 +783,16 @@ namespace FEPCT
 						    pixel += off_pm;
 						    ++x;
 						    --y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn right
 						    dir = 1;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0m] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -781,17 +802,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_0m;
 						    --y;
-						    // has_in_edge = left is not border
-						    has_in_edge = x != width_m1;
+						    // if border is to be suppressed, set pixel valid if right is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = x != width_m1;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn left
 						    dir = 3;
-						    // has_in_edge = has_in_edge or right is not border
-						    if (!has_in_edge)
-						        has_in_edge = x != width_m1;
+						    // set pixel valid if right is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = x != width_m1;
 						}
 
 					}
@@ -832,16 +854,16 @@ namespace FEPCT
 						    pixel += off_pp;
 						    ++x;
 						    ++y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn right
 						    dir = 2;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_p0] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -851,17 +873,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_p0;
 						    ++x;
-						    // has_in_edge = left is not border
-						    has_in_edge = y != height_m1;
+						    // if border is to be suppressed, set pixel valid if right is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = y != height_m1;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn left
 						    dir = 0;
-						    // has_in_edge = has_in_edge or right is not border
-						    if (!has_in_edge)
-						        has_in_edge = y != height_m1;
+						    // set pixel valid if right is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = y != height_m1;
 						}
 
 					}
@@ -902,16 +925,16 @@ namespace FEPCT
 						    pixel += off_mp;
 						    --x;
 						    ++y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn right
 						    dir = 3;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0p] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -921,17 +944,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_0p;
 						    ++y;
-						    // has_in_edge = left is not border
-						    has_in_edge = x != 0;
+						    // if border is to be suppressed, set pixel valid if right is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = x != 0;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn left
 						    dir = 1;
-						    // has_in_edge = has_in_edge or right is not border
-						    if (!has_in_edge)
-						        has_in_edge = x != 0;
+						    // set pixel valid if right is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = x != 0;
 						}
 
 					}
@@ -973,16 +997,16 @@ namespace FEPCT
 						    pixel += off_mm;
 						    --x;
 						    --y;
-						    // has_in_edge = true
-						    has_in_edge = true;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						    // turn right
 						    dir = 0;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_m0] != 0)
 						{
-						    // if not do_suppress_border or has_in_edge
-						    if (!do_suppress_border || has_in_edge)
+						    // if pixel is valid
+						    if (is_pixel_valid)
 						    {
 						        // emit current pixel
 						        contour.emplace_back(x, y);
@@ -992,17 +1016,18 @@ namespace FEPCT
 						    // go to checked pixel
 						    pixel += off_m0;
 						    --x;
-						    // has_in_edge = left is not border
-						    has_in_edge = y != 0;
+						    // if border is to be suppressed, set pixel valid if right is not border
+						    if (do_suppress_border)
+						        is_pixel_valid = y != 0;
 						}
 						// else (rule 3)
 						else
 						{
 						    // turn left
 						    dir = 2;
-						    // has_in_edge = has_in_edge or right is not border
-						    if (!has_in_edge)
-						        has_in_edge = y != 0;
+						    // set pixel valid if right is not border
+						    if (!is_pixel_valid)
+						        is_pixel_valid = y != 0;
 						}
 
 					}

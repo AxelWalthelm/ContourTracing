@@ -154,12 +154,26 @@ namespace o__NAMESPACE__o
 		int dir = -1;
 	};
 
-	// TContour needs to implement a small sub-set of std::vector<cv::Point>:
+	// If no direction dir is given (i.e. dir=-1) a direction is chosen automatically,
+	// which usually gives you what you expect, unless the object to trace is very narrow and the
+	// seed pixel is touching the contour twice, in which case tracing will start on the side with the smallest dir.
+	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
+	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
+	// to ensure the resulting contour is consistently 8-connected thin.
+	// The start pixel is always the first pixel in the contour, even if it is on the image border and do_suppress_border=true.
+	// This may seem inconsistent, but analyzing the start pixel for having an edge on the contour which
+	// is not on the image border would complicate the algorithm by having to handle rarely encountered situations
+	// (like, what if the image is only one pixel high?), it would slow down start-up time of contour tracing,
+	// and I have no indication that this would be a relevant use case for anyone. If you do have reason to
+	// choose a start pixel you also want to suppress, maybe you can just ignore it in the resulting contour?
+	//
+	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
 	//     void TContour::emplace_back(int x, int y);
-	// TImage needs to implement a small sub-set of cv::Mat:
-	//     int TImage::rows; // image height
-	//     int TImage::cols; // image width
-	//     uint8_t* TImage::ptr(int row, int col) // get pointer into continuous row-major single channel raster image memory
+	//
+	// TImage needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
+	//     int TImage::rows; // number of rows, i.e. image height
+	//     int TImage::cols; // number of columns, i.e. image width
+	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
 	template<typename TContour, typename TImage>
 	void findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
@@ -264,8 +278,10 @@ namespace o__NAMESPACE__o
 			: upperLimitContourLength(width, height);
 		int contour_length = 0;
 
-		// does current pixel have an edge on contour which is inside of the image, i.e. not only edges at image border
-		bool has_in_edge = !isLeftBorder(x, y, dir, clockwise, width, height);
+		// If do_suppress_border=true is_pixel_valid indicates if the current pixel has an edge
+		// on contour which is inside of the image, i.e. not only edges at image border.
+		// Otherwise it is always true.
+		bool is_pixel_valid = true; // start pixel is always part of contour
 
 		if (max_contour_length > 0)
 		{
@@ -291,28 +307,29 @@ namespace o__NAMESPACE__o
 
 					moveForward(x, y, dir);
 					moveLeft(x, y, dir, clockwise);
-					has_in_edge = true;
+					is_pixel_valid = true;
 
 					dir = left(dir, clockwise);
 				}
 				// (rule 2)
 				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
 				{
-					if (!do_suppress_border || has_in_edge)
+					if (is_pixel_valid)
 					{
 						contour.emplace_back(x, y);
 					}
 					if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
 						break;
 					moveForward(x, y, dir);
-					has_in_edge = isLeftBorder(x, y, dir, clockwise, width, height);
+					if (do_suppress_border)
+						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 				// (rule 3)
 				else
 				{
 					dir = right(dir, clockwise);
-					if (!has_in_edge)
-						has_in_edge = isLeftBorder(x, y, dir, clockwise, width, height);
+					if (!is_pixel_valid)
+						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 
 			} while (x != stop_x || y != stop_y || dir != stop_dir);

@@ -234,16 +234,16 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('        break;')
 	lines.append('    // go to checked pixel');
 	lines += move_pixel_code_lines(forward_left_vector(dir, clockwise), '    ');
-	lines.append('    // has_in_edge = true');
-	lines.append('    has_in_edge = true;');
+	lines.append('    // set pixel valid');
+	lines.append('    is_pixel_valid = true;');
 	lines.append('    // turn {}'.format(left));
 	lines.append('    dir = {};'.format(left_dir(dir, clockwise)))
 	lines.append('}')
 	lines.append('// else if forward pixel is foreground (rule 2)')
 	lines.append('else if ({})'.format(is_pixel_foreground_code(forward_vector(dir, clockwise))))
 	lines.append('{')
-	lines.append('    // if not do_suppress_border or has_in_edge')
-	lines.append('    if (!do_suppress_border || has_in_edge)')
+	lines.append('    // if pixel is valid')
+	lines.append('    if (is_pixel_valid)')
 	lines.append('    {')
 	lines.append('        // emit current pixel')
 	lines.append('        contour.emplace_back(x, y);')
@@ -252,17 +252,18 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('        break;')
 	lines.append('    // go to checked pixel');
 	lines += move_pixel_code_lines(forward_vector(dir, clockwise), '    ');
-	lines.append('    // has_in_edge = left is not border')
-	lines.append('    has_in_edge = {};'.format(is_left_not_border_code(dir, clockwise)))
+	lines.append('    // if border is to be suppressed, set pixel valid if {} is not border'.format(left))
+	lines.append('    if (do_suppress_border)')
+	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))
 	lines.append('}')
 	lines.append('// else (rule 3)')
 	lines.append('else')
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
 	lines.append('    dir = {};'.format(right_dir(dir, clockwise)))
-	lines.append('    // has_in_edge = has_in_edge or {} is not border'.format(left))
-	lines.append('    if (!has_in_edge)')
-	lines.append('        has_in_edge = {};'.format(is_left_not_border_code(dir, clockwise)))
+	lines.append('    // set pixel valid if {} is not border'.format(left))
+	lines.append('    if (!is_pixel_valid)')
+	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))
 	lines.append('}')
 	return '\n'.join(indent + l for l in lines)
 
