@@ -35,6 +35,38 @@ TODO
 	|                  2                  
   y |               (0, 1)                
 	v                                     
+
+Tracing contour of 4-connected objects
+----------------------------------------
+
+The current implementation does not support it.
+To trace contour pixel of a 4-connected foreground area, the rules need to be changed.
+For clockwise tracing they would be basically something like:
+	if forward pixel is not foreground
+		turn right
+	else if forward-left pixel is foreground
+		turn left
+	else
+		move ahead 
+
+The pixel emission would also change a little, giving rules like:
+	if forward pixel is not foreground
+		turn right
+	else if forward-left pixel is foreground
+		emit current pixel, emit foward pixel (if you want a 4-connected contour), turn left, move to forward-left pixel
+	else
+		emit current pixel, move ahead
+
+For counterclockwise tracing the rules change in that left is swapped with right.
+The rules for border suppression and optimized border checking should be similar too.
+Since OpenCV did not see any need to support 4-connected object contour tracing, a different way of testing
+the result needs to be found.
+
+As a workaround you might consider to invert the image and trace the background contour.
+The resulting contour line is still 8-connected, but the contour line goes around the 4-connected object,
+but all contour pixel are background, i.e. it will be "grown" outwards.
+Maybe your application would work better with eroding the inverted mask a little,
+but it still wouldn't be exactly the same result in the end.
 */
 
 namespace FEPCT
@@ -145,6 +177,40 @@ namespace FEPCT
 			return isForwardBorder(x, y, left(dir, clockwise), width, height);
 		}
 
+		// Analyze if the current edge or an earlier contour-edge of the given pixel is not on the image border
+		// by tracing up to 4 steps backward, but only if we stay on the given pixel.
+		inline bool hasPixelNonBorderEdgeBackwards(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		{
+			// turn around
+			dir = (dir + 2) % 4;
+			clockwise = !clockwise;
+
+			for (int step = 0; step < 4; step++)
+			{
+				// check if current edge is non-border
+				if (!isLeftBorder(x, y, dir, clockwise, width, height))
+					return true;
+
+				// (rule 1)
+				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				{
+					break; // next contour edge is on a different pixel
+				}
+				// (rule 2)
+				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				{
+					break; // next contour edge is on a different pixel
+				}
+				// (rule 3)
+				else
+				{
+					dir = right(dir, clockwise);
+				}
+			}
+
+			return false;
+		}
+
 	} // namespace
 
 	struct stop_t
@@ -161,12 +227,7 @@ namespace FEPCT
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
 	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
 	// to ensure the resulting contour is consistently 8-connected thin.
-	// The start pixel is always the first pixel in the contour, even if it is on the image border and do_suppress_border=true.
-	// This may seem inconsistent, but analyzing the start pixel for having an edge on the contour which
-	// is not on the image border would complicate the algorithm by having to handle rarely encountered situations
-	// (like, what if the image is only one pixel high?), it would slow down start-up time of contour tracing,
-	// and I have no indication that this would be a relevant use case for anyone. If you do have reason to
-	// choose a start pixel you also want to suppress, maybe you can just ignore it in the resulting contour?
+	// The start pixel will be the first pixel in contour, unless it has only contour edges at the image border and do_suppress_border is set.
 	//
 	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
 	//     void TContour::emplace_back(int x, int y);
@@ -282,7 +343,8 @@ namespace FEPCT
 		// If do_suppress_border=true is_pixel_valid indicates if the current pixel has an edge
 		// on contour which is inside of the image, i.e. not only edges at image border.
 		// Otherwise it is always true.
-		bool is_pixel_valid = true; // start pixel is always part of contour
+		bool is_pixel_valid = !do_suppress_border ||
+			hasPixelNonBorderEdgeBackwards(x, y, dir, clockwise, image_ptr, width, height, stride);
 
 		if (max_contour_length > 0)
 		{
@@ -290,42 +352,23 @@ namespace FEPCT
 #if !GENERATOR_OPTIMIZED
 
 			/*
-			direction 0 basic clockwise rules:
+			clockwise rules:
 			==================================
 			
-			                     rule 1:              rule 2:              rule 3:              
-			                     +-------+-------+    +-------+-------+    +-------+-------+    
-			                     |       |       |    |       ^       |    |       |       |    1: foreground
-			                     |   1   |  0/1  |    |   0   |   1   |    |   0   |   0   |    0: background or border
-			                     |  ???  |       |    |       |  ???  |    |       |  ???  |    /: alternative
-			                     +<------+-------+    +-------+-------+    +-------+------>+    
-			                     |       ^       |    |       ^       |    |       ^       |    (x,y): current pixel
-			                     |   0   |   1   |    |   0   |   1   |    |   0   |   1   |    ???: pixel to be checked
-			                     |       | (x,y) |    |       | (x,y) |    |       | (x,y) |    
-			                     +-------+-------+    +-------+-------+    +-------+-------+    
-			                     - turn left          - move ahead         - turn right
-			                     - emit pixel (x,y)   - emit pixel (x,y)
+			    rule 1:              rule 2:              rule 3:              
+			    +-------+-------+    +-------+-------+    +-------+-------+    
+			    |       |       |    |       ^       |    |       |       |    1: foreground
+			    |   1   |  0/1  |    |   0   |   1   |    |   0   |   0   |    0: background or border
+			    |  ???  |       |    |       |  ???  |    |       |  ???  |    /: alternative
+			    +<------+-------+    +-------+-------+    +-------+------>+    
+			    |       ^       |    |       ^       |    |       ^       |    (x,y): current pixel
+			    |   0   |   1   |    |   0   |   1   |    |   0   |   1   |    ???: pixel to be checked
+			    |       | (x,y) |    |       | (x,y) |    |       | (x,y) |    
+			    +-------+-------+    +-------+-------+    +-------+-------+    
+			    - turn left          - move ahead         - turn right
+			    - emit pixel (x,y)   - emit pixel (x,y)
 
-
-			direction 0 clockwise rules with border checks:
-			===============================================
-
-			rule 0:              rule 1:              rule 2:              rule 3:
-			+-------+-------+    +-------+-------+    +-------+-------+    +-------+-------+
-			|       |       |    |       |       |    |       ^       |    |       |       |    1: foreground
-			|   b   |   b   |    |   1   |  0/1  |    |  0/b  |   1   |    |  0/b  |   0   |    0: background
-			|  ???  |  ???  |    |  ???  |       |    |       |  ???  |    |       |  ???  |    b: border outside of image
-			+-------+------>+    +<------+-------+    +-------+-------+    +-------+------>+    /: alternative
-			|       ^       |    |       ^       |    |       ^       |    |       ^       |
-			|  0/b  |   1   |    |   0   |   1   |    |  0/b  |   1   |    |  0/b  |   1   |    (x,y): current pixel
-			|       | (x,y) |    |       | (x,y) |    |       | (x,y) |    |       | (x,y) |    ???: pixel to be checked
-			+-------+-------+    +-------+-------+    +-------+-------+    +-------+-------+
-			=> turn right        => turn left         => move ahead        => turn right
-			                     => emit pixel (x,y)  => emit pixel (x,y)
-
-			if forward is border (rule 0)
-			    turn right
-			else if left is not border and forward-left pixel is foreground (rule 1)
+			if forward-left pixel is foreground (rule 1)
 			    emit current pixel
 			    go to checked pixel
 			    set pixel valid
@@ -344,14 +387,8 @@ namespace FEPCT
 
 			do
 			{
-				// (rule 0)
-				if (isForwardBorder(x, y, dir, width, height))
-				{
-					dir = right(dir, clockwise);
-				}
 				// (rule 1)
-				else if (!isLeftBorder(x, y, dir, clockwise, width, height) &&
-						 isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
 				{
 					contour.emplace_back(x, y);
 					if (++contour_length >= max_contour_length)
@@ -1036,9 +1073,9 @@ namespace FEPCT
 
 #endif // GENERATOR_OPTIMIZED
 
-			if (contour_length == 0)
+			if (contour_length == 0 && is_pixel_valid)
 			{
-				// single isolated pixel
+				// contour object is a single isolated pixel
 				contour.emplace_back(x, y);
 			}
 		}

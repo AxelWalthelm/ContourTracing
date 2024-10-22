@@ -96,6 +96,9 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>python ContourTracingGenerator.py</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -110,6 +113,9 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>python ContourTracingGenerator.py</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -128,6 +134,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>python ContourTracingGenerator.py</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -146,21 +155,38 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PreBuildEvent>
+      <Command>python ContourTracingGenerator.py</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ContourTracingTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ContourTracing.hpp" />
-    <ClInclude Include="ContourTracingGeneratorTemplate.hpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClInclude>
+    <Text Include="ContourTracingGeneratorTemplate.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </DeploymentContent>
+    </Text>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ContourTracingGenerator.py" />
+    <CustomBuild Include="ContourTracingGenerator.py">
+      <FileType>Document</FileType>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

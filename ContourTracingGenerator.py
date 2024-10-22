@@ -1,9 +1,12 @@
 import os
+from stat import S_IREAD, S_IWUSR
 import re
 
 directory = os.path.dirname(os.path.abspath(__file__))
 template_file = os.path.join(directory, "ContourTracingGeneratorTemplate.hpp")
 output_file = os.path.join(directory, 'ContourTracing.hpp')
+
+print('ContourTracingGenerator.py -> {}'.format(output_file))
 
 namespace = "FEPCT"
 
@@ -348,5 +351,9 @@ for line_index, line in enumerate(lines):
 		break
 
 
+os.chmod(output_file, S_IREAD|S_IWUSR)  # make writable
+
 with open(output_file, 'w') as f:
 	f.write('\n'.join(lines) + '\n')
+
+os.chmod(output_file, S_IREAD)  # make readonly
