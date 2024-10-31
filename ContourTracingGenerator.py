@@ -43,10 +43,10 @@ TODO
 def vector(dir):
 	return ((0, -1), (1, 0), (0, 1), (-1, 0))[dir]
 
-def left_dir(dir, clockwise):
+def turn_left(dir, clockwise):
 	return (3, 0, 1, 2)[dir] if clockwise else (1, 2, 3, 0)[dir]
 
-def right_dir(dir, clockwise):
+def turn_right(dir, clockwise):
 	return (1, 2, 3, 0)[dir] if clockwise else (3, 0, 1, 2)[dir]
 
 def is_forward_border_code(dir):
@@ -59,14 +59,14 @@ def is_forward_border_no_m1_code(dir):
 	return is_forward_border_code(dir).replace("_m1", " - 1")
 
 def is_left_not_border_code(dir, clockwise):
-	return is_not_forward_border_code(left_dir(dir, clockwise))
+	return is_not_forward_border_code(turn_left(dir, clockwise))
 
 def forward_vector(dir, clockwise):
 	return vector(dir)
 
 def forward_left_vector(dir, clockwise):
 	v1 = vector(dir)
-	v2 = vector(left_dir(dir, clockwise))
+	v2 = vector(turn_left(dir, clockwise))
 	return (v1[0] + v2[0], v1[1] + v2[1])
 
 def forward_pixel(dir, clockwise):
@@ -225,7 +225,7 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('if ({})'.format(is_forward_border_code(dir)))
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
-	lines.append('    dir = {};'.format(right_dir(dir, clockwise)))
+	lines.append('    dir = {};'.format(turn_right(dir, clockwise)))
 	lines.append('}')
 	lines.append('// else if {0} is not border and forward-{0} pixel is foreground (rule 1)'.format(left))
 	lines.append('else if ({} && {})'.format(is_left_not_border_code(dir, clockwise),
@@ -233,14 +233,15 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('{')
 	lines.append('    // emit current pixel')
 	lines.append('    contour.emplace_back(x, y);')
-	lines.append('    if (++contour_length >= max_contour_length)')
-	lines.append('        break;')
 	lines.append('    // go to checked pixel');
 	lines += move_pixel_code_lines(forward_left_vector(dir, clockwise), '    ');
+	lines.append('    // turn {}'.format(left));
+	lines.append('    dir = {};'.format(turn_left(dir, clockwise)))
+	lines.append('    // stop if buffer is full')
+	lines.append('    if (++contour_length >= max_contour_length)')
+	lines.append('        break;')
 	lines.append('    // set pixel valid');
 	lines.append('    is_pixel_valid = true;');
-	lines.append('    // turn {}'.format(left));
-	lines.append('    dir = {};'.format(left_dir(dir, clockwise)))
 	lines.append('}')
 	lines.append('// else if forward pixel is foreground (rule 2)')
 	lines.append('else if ({})'.format(is_pixel_foreground_code(forward_vector(dir, clockwise))))
@@ -251,10 +252,11 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('        // emit current pixel')
 	lines.append('        contour.emplace_back(x, y);')
 	lines.append('    }')
-	lines.append('    if (++contour_length >= max_contour_length)' + (' // contour_length is the unsuppressed length' if dir == 0 and clockwise else ''))
-	lines.append('        break;')
 	lines.append('    // go to checked pixel');
 	lines += move_pixel_code_lines(forward_vector(dir, clockwise), '    ');
+	lines.append('    // stop if buffer is full')
+	lines.append('    if (++contour_length >= max_contour_length)' + (' // contour_length is the unsuppressed length' if dir == 0 and clockwise else ''))
+	lines.append('        break;')
 	lines.append('    // if border is to be suppressed, set pixel valid if {} is not border'.format(left))
 	lines.append('    if (do_suppress_border)')
 	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))
@@ -263,7 +265,7 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('else')
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
-	lines.append('    dir = {};'.format(right_dir(dir, clockwise)))
+	lines.append('    dir = {};'.format(turn_right(dir, clockwise)))
 	lines.append('    // set pixel valid if {} is not border'.format(left))
 	lines.append('    if (!is_pixel_valid)')
 	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))

@@ -2,7 +2,18 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <vector>
+#define FEPCT_GENERATOR_OPTIMIZED 1
 #include "ContourTracing.hpp"
+
+static bool TEST_failed = false;
+
+void TEST_ErrorHandler(const char* failed_expression, const char* function_name, const char* file_name, int line_number)
+{
+	TEST_failed = true;
+	printf("TEST failed: %s in function %s: %s(%d)\n", failed_expression, function_name, file_name, line_number);
+}
+#define TEST(expr) do { if(!TEST_failed && !!(expr)) ; else TEST_ErrorHandler(#expr, __func__, __FILE__, __LINE__ ); } while(0)
+
 
 int getPixel(const cv::Mat& image, int x, int y, int border = -1)
 {
@@ -100,14 +111,16 @@ int hierachy_level(const std::vector<cv::Vec4i>& hierarchy, int contour_index)
 	}
 }
 
-void drawContourTransparent(cv::Mat& image, std::vector<cv::Point> contour, cv::Scalar color)
+void drawContourTransparent(cv::Mat& image, const std::vector<cv::Point>& contour, cv::Scalar color, int max_length = -1)
 {
 	int b = int(color[0]) / 2;
 	int g = int(color[1]) / 2;
 	int r = int(color[2]) / 2;
 
-	for (cv::Point p: contour)
+	int len = std::min(int(contour.size()), max_length < 0 ? INT_MAX : max_length);
+	for (int i = 0; i < len; i++)
 	{
+		cv::Point p = contour[i];
 		cv::Vec3b& pixel = image.at<cv::Vec3b>(p.y, p.x);
 		pixel[0] = pixel[0] / 2 + b;
 		pixel[1] = pixel[1] / 2 + g;
@@ -115,13 +128,49 @@ void drawContourTransparent(cv::Mat& image, std::vector<cv::Point> contour, cv::
 	}
 }
 
+void drawContourSingleChannel(cv::Mat& image, const std::vector<cv::Point>& contour, int channel_index, int channel_value)
+{
+	for (cv::Point p: contour)
+	{
+		cv::Vec3b& pixel = image.at<cv::Vec3b>(p.y, p.x);
+		pixel[channel_index] = channel_value;
+	}
+}
+
+bool TEST_showFailed(cv::Mat& image, const std::vector<cv::Point>& contour, const std::vector<cv::Point>& expected_contour, int contour_index)
+{
+	if (!TEST_failed)
+		return false;
+
+	printf("  contour_index=%d\n", contour_index);
+
+	for (int i = -1; i < int(std::max(expected_contour.size(), contour.size())); i++)
+	{
+		cv::Mat display;
+		cv::cvtColor(image, display, cv::COLOR_GRAY2BGR);
+
+		drawContourTransparent(display, expected_contour, cv::Scalar(0, 255, 0));
+		drawContourTransparent(display, contour, cv::Scalar(0, 0, 255), i);
+		cv::namedWindow("display", cv::WINDOW_NORMAL);
+		cv::imshow("display", display);
+		int key = cv::waitKey();
+		if (key < 0 || key == 27)
+			break;
+	}
+
+	return true;
+}
+
+
 int main()
 {
 	std::srand(471142);
 	cv::Mat image(100, 200, CV_8UC1);
 
-	while (true)
+	for (int test = 0; test < 1000; test++)
 	{
+		printf("test=%d\n", test);
+
 		setRandom(image);
 
 		std::vector<std::vector<cv::Point>> contours;
@@ -130,60 +179,86 @@ int main()
 		printf("contours %d\n", int(contours.size()));
 		printf("hierarchy %dx4\n", int(hierarchy.size()));
 
-		cv::Mat display;
-		cv::cvtColor(image, display, cv::COLOR_GRAY2BGR);
-		//cv::drawContours(display, contours, -1, cv::Scalar(0, 0, 255), 1, cv::LINE_8, hierarchy, 1);
-
-		std::vector<int> contour_indexes;
 		for (int contour_index = 0; contour_index < int(contours.size()); contour_index++)
 		{
-			if (hierachy_level(hierarchy, contour_index) % 2 == 1)
+			std::vector<cv::Point> expected_contour = contours[contour_index];
+			bool is_outer = hierachy_level(hierarchy, contour_index) % 2 == 0;
+
+			// trace from start point
+			/////////////////////////////////////
 			{
-				contour_indexes.push_back(contour_index);
+				cv::Point start = expected_contour[0];
+				int dir = is_outer ? 2 : 0;
+				bool clockwise = false;
+				std::vector<cv::Point> contour;
+				FEPCT::stop_t stop;
+				bool test_stop = rand_int(1) == 1;
+				FEPCT::findContour(contour, image, start.x, start.y, dir, clockwise, false, test_stop ? &stop : NULL);
+
+				TEST(contour.size() == expected_contour.size());
+				for (int i = 0; i < int(expected_contour.size() && !TEST_failed); i++)
+				{
+					TEST(contour[i] == expected_contour[i]);
+					if (TEST_failed)
+						printf("  i=%d\n", i);
+				}
+
+				TEST(stop.max_contour_length == (test_stop ? int(expected_contour.size()) : -1));
+
+				if (TEST_showFailed(image, contour, expected_contour, contour_index))
+					break;
+			}
+
+			// trace from start in small random steps
+			///////////////////////////////////////////
+			{
+				cv::Point start = expected_contour[0];
+				int dir = is_outer ? 2 : 0;
+				bool clockwise = false;
+				std::vector<cv::Point> contour;
+
+				while (contour.size() < expected_contour.size())
+				{
+					int before = int(contour.size());
+					int step = rand_int(5);
+					int after = before + step;
+					if (after > int(expected_contour.size()))
+					{
+						after = int(expected_contour.size());
+						step = after - before;
+					}
+					FEPCT::stop_t stop;
+					stop.max_contour_length = step;
+					FEPCT::findContour(contour, image, start.x, start.y, dir, clockwise, false, &stop);
+					TEST(int(contour.size()) == after);
+
+					for (int i = 0; i < after && !TEST_failed; i++)
+					{
+						TEST(contour[i] == expected_contour[i]);
+						if (TEST_failed)
+							printf("  i=%d before=%d step=%d after=%d\n", i, before, step, after);
+					}
+
+					TEST(stop.max_contour_length == step);
+
+					if (TEST_showFailed(image, contour, expected_contour, contour_index))
+						break;
+
+					start.x = stop.x;
+					start.y = stop.y;
+					dir = stop.dir;
+				}
 			}
 		}
 
-		for (int contour_index: contour_indexes)
-		{
-			//cv::drawContours(display, contours, contour_index, randomSaturatedColor(), 1, cv::LINE_8);
-			drawContourTransparent(display, contours[contour_index], randomSaturatedColor());
-		}
-
-		cv::resize(display, display, cv::Size(), 2.0, 2.0, cv::INTER_NEAREST);
-		for (int contour_index: contour_indexes)
-		{
-			cv::Point p = contours[contour_index][0];
-			cv::Vec3b& pixel = display.at<cv::Vec3b>(2 * p.y, 2 * p.x);
-			pixel[0] = 1;
-			pixel[1] = 1;
-			pixel[2] = 1;
-
-			if (contours[contour_index].size() > 1)
-			{
-				cv::Point p = contours[contour_index][1];
-				cv::Vec3b& pixel = display.at<cv::Vec3b>(2 * p.y + 1, 2 * p.x);
-				pixel[0] = 1;
-				pixel[1] = 1;
-				pixel[2] = 1;
-			}
-		}
-
-		std::vector<cv::Point> contour;
-		//FEPCT::findContour(contour, image, 0, 0, -1, true);
-
-		if (contour_indexes.size() == 0)
-			continue;
-
-		printf("drawn %d\n", int(contour_indexes.size()));
-
-		cv::namedWindow("image", cv::WINDOW_NORMAL);
-		cv::imshow("image", image);
-		cv::namedWindow("display", cv::WINDOW_NORMAL);
-		cv::imshow("display", display);
-		int key = cv::waitKey();
-		if (key < 0 || key == 27)
+		if (TEST_failed)
 			break;
 	}
+
+	if (TEST_failed)
+		printf("TEST FAILED!\n");
+	else
+		printf("TEST OK\n");
 
 	return 0;
 }

@@ -12,7 +12,9 @@ Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.
 #include <stdint.h>
 #include <limits.h>
 
-#define GENERATOR_OPTIMIZED 0
+#ifndef FEPCT_GENERATOR_OPTIMIZED
+#define FEPCT_GENERATOR_OPTIMIZED 0
+#endif
 
 /*
  Fast Edge-Based Pixel Contour Tracing from Seed Point
@@ -121,21 +123,21 @@ namespace FEPCT
 			return x >= 0 && y >= 0 && x < width && y < height && image_ptr[x + y * stride] != 0;
 		}
 
-		inline int left(int dir, bool clockwise)
+		inline int turnLeft(int dir, bool clockwise)
 		{
 			// rules for tracing counterclockwise turn left into right and vice versa
 			return (dir + (clockwise ? 4 - 1 : 1)) & 3;
 		}
 
-		inline int right(int dir, bool clockwise)
+		inline int turnRight(int dir, bool clockwise)
 		{
 			// rules for tracing counterclockwise turn left into right and vice versa
-			return left(dir, !clockwise);
+			return turnLeft(dir, !clockwise);
 		}
 
 		inline void moveLeft(int& x, int& y, int dir, bool clockwise)
 		{
-			dir = left(dir, clockwise);
+			dir = turnLeft(dir, clockwise);
 			x += dx[dir];
 			y += dy[dir];
 		}
@@ -174,7 +176,7 @@ namespace FEPCT
 
 		inline bool isLeftBorder(int x, int y, int dir, bool clockwise, int width, int height)
 		{
-			return isForwardBorder(x, y, left(dir, clockwise), width, height);
+			return isForwardBorder(x, y, turnLeft(dir, clockwise), width, height);
 		}
 
 		// Analyze if the current edge or an earlier contour-edge of the given pixel is not on the image border
@@ -204,7 +206,7 @@ namespace FEPCT
 				// (rule 3)
 				else
 				{
-					dir = right(dir, clockwise);
+					dir = turnRight(dir, clockwise);
 				}
 			}
 
@@ -215,7 +217,17 @@ namespace FEPCT
 
 	struct stop_t
 	{
+		// Usually the full contour is traced.
+		// Sometimes it is useful to limit the length of the contour, e.g. to limit time and memory usage.
+		// Set it to zero to only do startup logic like choosing a valid start direction.
+		// In: if >= 0 then the maximum allowed contour length
+		// Out: number of traced contour pixels including suppressed pixels
 		int max_contour_length = -1;
+
+		// Usually tracing stops when the start position is reached.
+		// Sometimes it is useful to stop at another known position on the contour.
+		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!
+		// Out: (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached
 		int x;
 		int y;
 		int dir = -1;
@@ -223,7 +235,7 @@ namespace FEPCT
 
 	// If no direction dir is given (i.e. dir=-1) a direction is chosen automatically,
 	// which usually gives you what you expect, unless the object to trace is very narrow and the
-	// seed pixel is touching the contour twice, in which case tracing will start on the side with the smallest dir.
+	// seed pixel is touching the contour on both sides, in which case tracing will start on the side with the smallest dir.
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
 	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
 	// to ensure the resulting contour is consistently 8-connected thin.
@@ -349,7 +361,7 @@ namespace FEPCT
 		if (max_contour_length > 0)
 		{
 
-#if !GENERATOR_OPTIMIZED
+#if !FEPCT_GENERATOR_OPTIMIZED
 
 			/*
 			clockwise rules:
@@ -371,12 +383,14 @@ namespace FEPCT
 			if forward-left pixel is foreground (rule 1)
 			    emit current pixel
 			    go to checked pixel
-			    set pixel valid
 			    turn left
+			    stop if buffer is full
+			    set pixel valid
 			else if forward pixel is foreground (rule 2)
 			    if pixel is valid
 			        emit current pixel
 			    go to checked pixel
+			    stop if buffer is full
 			    if border is to be suppressed, set pixel valid if left is not border
 			else (rule 3)
 			    turn right
@@ -391,14 +405,12 @@ namespace FEPCT
 				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
 				{
 					contour.emplace_back(x, y);
-					if (++contour_length >= max_contour_length)
-						break;
-
 					moveForward(x, y, dir);
 					moveLeft(x, y, dir, clockwise);
+					dir = turnLeft(dir, clockwise);
+					if (++contour_length >= max_contour_length)
+						break;
 					is_pixel_valid = true;
-
-					dir = left(dir, clockwise);
 				}
 				// (rule 2)
 				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
@@ -407,16 +419,16 @@ namespace FEPCT
 					{
 						contour.emplace_back(x, y);
 					}
+					moveForward(x, y, dir);
 					if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
 						break;
-					moveForward(x, y, dir);
 					if (do_suppress_border)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 				// (rule 3)
 				else
 				{
-					dir = right(dir, clockwise);
+					dir = turnRight(dir, clockwise);
 					if (!is_pixel_valid)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
@@ -484,12 +496,14 @@ namespace FEPCT
 						else if left is not border and forward-left pixel is foreground (rule 1)
 						    emit current pixel
 						    go to checked pixel
-						    set pixel valid
 						    turn left
+						    stop if buffer is full
+						    set pixel valid
 						else if forward pixel is foreground (rule 2)
 						    if pixel is valid
 						        emit current pixel
 						    go to checked pixel
+						    stop if buffer is full
 						    if border is to be suppressed, set pixel valid if left is not border
 						else (rule 3)
 						    turn right
@@ -507,16 +521,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_mm;
 						    --x;
 						    --y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn left
 						    dir = 3;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0m] != 0)
@@ -527,11 +542,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
-						        break;
 						    // go to checked pixel
 						    pixel += off_0m;
 						    --y;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
+						        break;
 						    // if border is to be suppressed, set pixel valid if left is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = x != 0;
@@ -578,16 +594,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_pm;
 						    ++x;
 						    --y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn left
 						    dir = 0;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_p0] != 0)
@@ -598,11 +615,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_p0;
 						    ++x;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if left is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = y != 0;
@@ -649,16 +667,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_pp;
 						    ++x;
 						    ++y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn left
 						    dir = 1;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0p] != 0)
@@ -669,11 +688,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_0p;
 						    ++y;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if left is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = x != width_m1;
@@ -721,16 +741,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_mp;
 						    --x;
 						    ++y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn left
 						    dir = 2;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_m0] != 0)
@@ -741,11 +762,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_m0;
 						    --x;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if left is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = y != height_m1;
@@ -791,12 +813,14 @@ namespace FEPCT
 						else if right is not border and forward-right pixel is foreground (rule 1)
 						    emit current pixel
 						    go to checked pixel
-						    set pixel valid
 						    turn right
+						    stop if buffer is full
+						    set pixel valid
 						else if forward pixel is foreground (rule 2)
 						    if pixel is valid
 						        emit current pixel
 						    go to checked pixel
+						    stop if buffer is full
 						    if border is to be suppressed, set pixel valid if right is not border
 						else (rule 3)
 						    turn left
@@ -814,16 +838,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_pm;
 						    ++x;
 						    --y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn right
 						    dir = 1;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0m] != 0)
@@ -834,11 +859,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_0m;
 						    --y;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if right is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = x != width_m1;
@@ -885,16 +911,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_pp;
 						    ++x;
 						    ++y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn right
 						    dir = 2;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_p0] != 0)
@@ -905,11 +932,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_p0;
 						    ++x;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if right is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = y != height_m1;
@@ -956,16 +984,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_mp;
 						    --x;
 						    ++y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn right
 						    dir = 3;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_0p] != 0)
@@ -976,11 +1005,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_0p;
 						    ++y;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if right is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = x != 0;
@@ -1028,16 +1058,17 @@ namespace FEPCT
 						{
 						    // emit current pixel
 						    contour.emplace_back(x, y);
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_mm;
 						    --x;
 						    --y;
-						    // set pixel valid
-						    is_pixel_valid = true;
 						    // turn right
 						    dir = 0;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
+						    // set pixel valid
+						    is_pixel_valid = true;
 						}
 						// else if forward pixel is foreground (rule 2)
 						else if (pixel[off_m0] != 0)
@@ -1048,11 +1079,12 @@ namespace FEPCT
 						        // emit current pixel
 						        contour.emplace_back(x, y);
 						    }
-						    if (++contour_length >= max_contour_length)
-						        break;
 						    // go to checked pixel
 						    pixel += off_m0;
 						    --x;
+						    // stop if buffer is full
+						    if (++contour_length >= max_contour_length)
+						        break;
 						    // if border is to be suppressed, set pixel valid if right is not border
 						    if (do_suppress_border)
 						        is_pixel_valid = y != 0;
@@ -1071,17 +1103,19 @@ namespace FEPCT
 				} while (x != stop_x || y != stop_y || dir != stop_dir);
 			}
 
-#endif // GENERATOR_OPTIMIZED
+#endif // FEPCT_GENERATOR_OPTIMIZED
 
 			if (contour_length == 0 && is_pixel_valid)
 			{
 				// contour object is a single isolated pixel
-				contour.emplace_back(x, y);
+				contour.emplace_back(start_x, start_y);
+				++contour_length;
 			}
 		}
 
 		if (stop != NULL)
 		{
+			stop->max_contour_length = contour_length; // unsuppressed contour length
 			stop->x = x;
 			stop->y = y;
 			stop->dir = dir;

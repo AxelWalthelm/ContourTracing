@@ -30,7 +30,9 @@ o__WARNING_CODE_IS_GENERATED__o
 #include <stdint.h>
 #include <limits.h>
 
-#define GENERATOR_OPTIMIZED 0
+#ifndef o__NAMESPACE__o_GENERATOR_OPTIMIZED
+#define o__NAMESPACE__o_GENERATOR_OPTIMIZED 0
+#endif
 
 /*
 o__INTRODUCTION__o
@@ -120,21 +122,21 @@ namespace o__NAMESPACE__o
 			return x >= 0 && y >= 0 && x < width && y < height && o__isValueForeground(image_ptr[x + y * stride])__o;
 		}
 
-		inline int left(int dir, bool clockwise)
+		inline int turnLeft(int dir, bool clockwise)
 		{
 			// rules for tracing counterclockwise turn left into right and vice versa
 			return (dir + (clockwise ? 4 - 1 : 1)) & 3;
 		}
 
-		inline int right(int dir, bool clockwise)
+		inline int turnRight(int dir, bool clockwise)
 		{
 			// rules for tracing counterclockwise turn left into right and vice versa
-			return left(dir, !clockwise);
+			return turnLeft(dir, !clockwise);
 		}
 
 		inline void moveLeft(int& x, int& y, int dir, bool clockwise)
 		{
-			dir = left(dir, clockwise);
+			dir = turnLeft(dir, clockwise);
 			x += dx[dir];
 			y += dy[dir];
 		}
@@ -173,7 +175,7 @@ namespace o__NAMESPACE__o
 
 		inline bool isLeftBorder(int x, int y, int dir, bool clockwise, int width, int height)
 		{
-			return isForwardBorder(x, y, left(dir, clockwise), width, height);
+			return isForwardBorder(x, y, turnLeft(dir, clockwise), width, height);
 		}
 
 		// Analyze if the current edge or an earlier contour-edge of the given pixel is not on the image border
@@ -203,7 +205,7 @@ namespace o__NAMESPACE__o
 				// (rule 3)
 				else
 				{
-					dir = right(dir, clockwise);
+					dir = turnRight(dir, clockwise);
 				}
 			}
 
@@ -214,7 +216,17 @@ namespace o__NAMESPACE__o
 
 	struct stop_t
 	{
+		// Usually the full contour is traced.
+		// Sometimes it is useful to limit the length of the contour, e.g. to limit time and memory usage.
+		// Set it to zero to only do startup logic like choosing a valid start direction.
+		// In: if >= 0 then the maximum allowed contour length
+		// Out: number of traced contour pixels including suppressed pixels
 		int max_contour_length = -1;
+
+		// Usually tracing stops when the start position is reached.
+		// Sometimes it is useful to stop at another known position on the contour.
+		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!
+		// Out: (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached
 		int x;
 		int y;
 		int dir = -1;
@@ -222,7 +234,7 @@ namespace o__NAMESPACE__o
 
 	// If no direction dir is given (i.e. dir=-1) a direction is chosen automatically,
 	// which usually gives you what you expect, unless the object to trace is very narrow and the
-	// seed pixel is touching the contour twice, in which case tracing will start on the side with the smallest dir.
+	// seed pixel is touching the contour on both sides, in which case tracing will start on the side with the smallest dir.
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
 	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
 	// to ensure the resulting contour is consistently 8-connected thin.
@@ -348,7 +360,7 @@ namespace o__NAMESPACE__o
 		if (max_contour_length > 0)
 		{
 
-#if !GENERATOR_OPTIMIZED
+#if !o__NAMESPACE__o_GENERATOR_OPTIMIZED
 
 			//o__#__o// o__TRACE_GENERIC_COMMENT__o;
 			/*
@@ -371,12 +383,14 @@ namespace o__NAMESPACE__o
 			if forward-left pixel is foreground (rule 1)
 			    emit current pixel
 			    go to checked pixel
-			    set pixel valid
 			    turn left
+			    stop if buffer is full
+			    set pixel valid
 			else if forward pixel is foreground (rule 2)
 			    if pixel is valid
 			        emit current pixel
 			    go to checked pixel
+			    stop if buffer is full
 			    if border is to be suppressed, set pixel valid if left is not border
 			else (rule 3)
 			    turn right
@@ -391,14 +405,12 @@ namespace o__NAMESPACE__o
 				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
 				{
 					contour.emplace_back(x, y);
-					if (++contour_length >= max_contour_length)
-						break;
-
 					moveForward(x, y, dir);
 					moveLeft(x, y, dir, clockwise);
+					dir = turnLeft(dir, clockwise);
+					if (++contour_length >= max_contour_length)
+						break;
 					is_pixel_valid = true;
-
-					dir = left(dir, clockwise);
 				}
 				// (rule 2)
 				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
@@ -407,16 +419,16 @@ namespace o__NAMESPACE__o
 					{
 						contour.emplace_back(x, y);
 					}
+					moveForward(x, y, dir);
 					if (++contour_length >= max_contour_length) // contour_length is the unsuppressed length
 						break;
-					moveForward(x, y, dir);
 					if (do_suppress_border)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
 				// (rule 3)
 				else
 				{
-					dir = right(dir, clockwise);
+					dir = turnRight(dir, clockwise);
 					if (!is_pixel_valid)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
@@ -489,17 +501,19 @@ namespace o__NAMESPACE__o
 				} while (x != stop_x || y != stop_y || dir != stop_dir);
 			}
 
-#endif // GENERATOR_OPTIMIZED
+#endif // o__NAMESPACE__o_GENERATOR_OPTIMIZED
 
 			if (contour_length == 0 && is_pixel_valid)
 			{
 				// contour object is a single isolated pixel
-				contour.emplace_back(x, y);
+				contour.emplace_back(start_x, start_y);
+				++contour_length;
 			}
 		}
 
 		if (stop != NULL)
 		{
+			stop->max_contour_length = contour_length; // unsuppressed contour length
 			stop->x = x;
 			stop->y = y;
 			stop->dir = dir;
