@@ -159,7 +159,7 @@ bool TEST_showFailed(cv::Mat& image, const std::vector<cv::Point>& contour, cons
 		cv::cvtColor(image, display, cv::COLOR_GRAY2BGR);
 
 		drawContourTransparent(display, expected_contour, cv::Scalar(0, 255, 0));
-		drawContourTransparent(display, contour, cv::Scalar(0, 0, 255), i);
+		drawContourTransparent(display, contour, cv::Scalar(0, 0, 255), i + 1);
 		cv::namedWindow("display", cv::WINDOW_NORMAL);
 		cv::imshow("display", display);
 		int key = cv::waitKey();
@@ -191,7 +191,7 @@ double logBinUpperLimit(int bin)
 
 int main()
 {
-#if true // test logBin
+#if false // test logBin
 	{
 		for (int i = -1; i < logBinsMax; i++)
 		{
@@ -262,7 +262,7 @@ int main()
 				duration_FEPCT_counts[bin] += int(expected_contour.size());
 
 				TEST(contour.size() == expected_contour.size());
-				for (int i = 0; i < int(expected_contour.size() && !TEST_failed); i++)
+				for (int i = 0; i < int(expected_contour.size()) && !TEST_failed; i++)
 				{
 					TEST(contour[i] == expected_contour[i]);
 					if (TEST_failed)
@@ -314,6 +314,29 @@ int main()
 					start.y = stop.y;
 					dir = stop.dir;
 				}
+			}
+
+			// trace from start point clockwise
+			/////////////////////////////////////
+			{
+				cv::Point start = expected_contour[0];
+				int dir = is_outer ? 0 : 2;
+				bool clockwise = true;
+				std::vector<cv::Point> contour;
+				FEPCT::findContour(contour, image, start.x, start.y, dir, clockwise, false);
+
+				int expected_size = int(expected_contour.size());
+				TEST(contour.size() == expected_size);
+				for (int i = 0; i < expected_size && !TEST_failed; i++)
+				{
+					int ii = i == 0 ? 0 : expected_size - i; // corresponding index in clockwise contour
+					TEST(contour[ii] == expected_contour[i]);
+					if (TEST_failed)
+						printf("  i=%d ii=%d\n", i, ii);
+				}
+
+				if (TEST_showFailed(image, contour, expected_contour, contour_index))
+					break;
 			}
 		}
 
