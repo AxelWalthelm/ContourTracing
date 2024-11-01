@@ -3,11 +3,13 @@
   <ItemGroup>
     <ClInclude Include="ContourTracing.hpp" />
     <ClInclude Include="ContourTracingGeneratorTemplate.hpp" />
+    <ClInclude Include="HighResolutionTimer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ContourTracingGenerator.py" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ContourTracingTest.cpp" />
+    <ClCompile Include="HighResolutionTimer.cpp" />
   </ItemGroup>
 </Project>

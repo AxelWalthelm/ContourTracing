@@ -2,8 +2,16 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <vector>
+#include "HighResolutionTimer.h"
+
+/*
+Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" show that
+hand/script optimized code is (only) a few percent faster, especially on longer contours.
+Other processors and architectures may benefit more from optimized code. (ARM, smaller RISC processors, ...?)
+*/
 #define FEPCT_GENERATOR_OPTIMIZED 1
 #include "ContourTracing.hpp"
+
 
 static bool TEST_failed = false;
 
@@ -12,7 +20,8 @@ void TEST_ErrorHandler(const char* failed_expression, const char* function_name,
 	TEST_failed = true;
 	printf("TEST failed: %s in function %s: %s(%d)\n", failed_expression, function_name, file_name, line_number);
 }
-#define TEST(expr) do { if(!TEST_failed && !!(expr)) ; else TEST_ErrorHandler(#expr, __func__, __FILE__, __LINE__ ); } while(0)
+
+#define TEST(expr) do { if(TEST_failed || !!(expr)) ; else TEST_ErrorHandler(#expr, __func__, __FILE__, __LINE__ ); } while(0)
 
 
 int getPixel(const cv::Mat& image, int x, int y, int border = -1)
@@ -161,11 +170,59 @@ bool TEST_showFailed(cv::Mat& image, const std::vector<cv::Point>& contour, cons
 	return true;
 }
 
+constexpr int logBinsMax = 711;  // logBin(std::numeric_limits<double>().max())+1
+
+int logBin(double value)
+{
+	if (value <= 1.0)
+		return 0;
+	if (std::isinf(value))
+		value = std::numeric_limits<double>().max();
+	return int(std::ceil(std::log(value)));
+}
+
+double logBinUpperLimit(int bin)
+{
+	if (bin < 0)
+		return 1.0;
+	return std::exp(double(bin));
+}
+
 
 int main()
 {
+#if true // test logBin
+	{
+		for (int i = -1; i < logBinsMax; i++)
+		{
+			double v = logBinUpperLimit(i);
+			int ii = logBin(v);
+			printf("%d => %g => %d\n", i, v, ii);
+			TEST(ii == std::max(0, i));
+			if (std::isinf(v))
+			{
+				TEST(i == logBinsMax - 1);
+				break;
+			}
+		}
+
+		if (TEST_failed)
+		{
+			printf("TEST FAILED!\n");
+			return 0;
+		}
+
+		printf("TEST OK\n");
+	}
+#endif
+
 	std::srand(471142);
 	cv::Mat image(100, 200, CV_8UC1);
+
+	uint64_t duration_OpenCV = 0;
+	int duration_OpenCV_count = 0;
+	uint64_t duration_FEPCT_bins[logBinsMax] = { 0 };
+	int duration_FEPCT_counts[logBinsMax] = { 0 };
 
 	for (int test = 0; test < 1000; test++)
 	{
@@ -175,7 +232,12 @@ int main()
 
 		std::vector<std::vector<cv::Point>> contours;
 		std::vector<cv::Vec4i> hierarchy;
-		cv::findContours(image, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE);
+		HighResolutionTime_t timer_start = GetHighResolutionTime();
+		cv::findContours(image, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_NONE); // cv::RETR_CCOMP has similar speed
+		duration_OpenCV += GetHighResolutionTimeElapsedNs(timer_start);
+		for (std::vector<cv::Point> contour: contours)
+			duration_OpenCV_count += int(contour.size());
+
 		printf("contours %d\n", int(contours.size()));
 		printf("hierarchy %dx4\n", int(hierarchy.size()));
 
@@ -193,7 +255,11 @@ int main()
 				std::vector<cv::Point> contour;
 				FEPCT::stop_t stop;
 				bool test_stop = rand_int(1) == 1;
+				int bin = logBin(double(expected_contour.size()));
+				timer_start = GetHighResolutionTime();
 				FEPCT::findContour(contour, image, start.x, start.y, dir, clockwise, false, test_stop ? &stop : NULL);
+				duration_FEPCT_bins[bin] += GetHighResolutionTimeElapsedNs(timer_start);
+				duration_FEPCT_counts[bin] += int(expected_contour.size());
 
 				TEST(contour.size() == expected_contour.size());
 				for (int i = 0; i < int(expected_contour.size() && !TEST_failed); i++)
@@ -250,6 +316,23 @@ int main()
 				}
 			}
 		}
+
+		uint64_t duration_FEPCT = 0;
+		int duration_FEPCT_count = 0;
+		int max_bin = logBinsMax - 1;
+		while (max_bin >= 0 && duration_FEPCT_counts[max_bin] == 0)
+			--max_bin;
+		for (int bin = 0; bin <= max_bin; bin++)
+		{
+			printf("  %d (%d): %lld ns, %d pix, %lld ns/pix\n",
+				bin, int(logBinUpperLimit(bin)), duration_FEPCT_bins[bin], duration_FEPCT_counts[bin],
+				duration_FEPCT_bins[bin] / duration_FEPCT_counts[bin]);
+			duration_FEPCT += duration_FEPCT_bins[bin];
+			duration_FEPCT_count += duration_FEPCT_counts[bin];
+		}
+		printf("time OpenCV: %11lld ns, %d pix, %lld ns/pix\n", duration_OpenCV, duration_OpenCV_count, duration_OpenCV / duration_OpenCV_count);
+		printf("time FEPCT:  %11lld ns, %d pix, %lld ns/pix\n", duration_FEPCT, duration_FEPCT_count, duration_FEPCT / duration_FEPCT_count);
+		printf("time ratio: %.3f\n", double(duration_FEPCT) / double(duration_OpenCV));
 
 		if (TEST_failed)
 			break;
