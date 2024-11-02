@@ -260,8 +260,8 @@ namespace o__NAMESPACE__o
 		const int height_m1 = height - 1;
 
 		const uint8_t* image_ptr = image.ptr(0, 0);
-		const int stride = int(image.ptr(1, 0) - image_ptr);
-		o__NAMESPACE__o_Assert(image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
+		const int stride = height == 1 ? width : int(image.ptr(1, 0) - image_ptr);
+		o__NAMESPACE__o_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
 		o__NAMESPACE__o_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
 		o__NAMESPACE__o_Assert(isForeground(x, y, image_ptr, width, height, stride), "seed pixel is not foreground");
@@ -323,6 +323,8 @@ namespace o__NAMESPACE__o
 						break;
 				}
 			}
+
+			o__NAMESPACE__o_Assert(dir < 4, "bad seed pixel");
 		}
 
 		if (isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride) &&
@@ -331,7 +333,7 @@ namespace o__NAMESPACE__o
 			moveForward(x, y, dir);
 		}
 
-		FEPCT_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "seed pixel has bad direction");
+		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed");
 		const int start_x = x;
 		const int start_y = y;
 		const int start_dir = dir;
@@ -503,11 +505,14 @@ namespace o__NAMESPACE__o
 
 #endif // o__NAMESPACE__o_GENERATOR_OPTIMIZED
 
-			if (contour_length == 0 && is_pixel_valid)
+			if (contour_length == 0)
 			{
 				// contour object is a single isolated pixel
-				contour.emplace_back(start_x, start_y);
-				++contour_length;
+				if (is_pixel_valid)
+				{
+					contour.emplace_back(start_x, start_y);
+				}
+				++contour_length; // contour_length is the unsuppressed length
 			}
 		}
 

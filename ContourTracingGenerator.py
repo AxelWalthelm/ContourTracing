@@ -265,7 +265,8 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('else')
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
-	lines.append('    dir = {};'.format(turn_right(dir, clockwise)))
+	dir = turn_right(dir, clockwise)
+	lines.append('    dir = {};'.format(dir))
 	lines.append('    // set pixel valid if {} is not border'.format(left))
 	lines.append('    if (!is_pixel_valid)')
 	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))
@@ -285,7 +286,7 @@ def make_trace_step_code(dir, clockwise, indent):
 		code += "\n"
 		code += make_rules_code_summary(dir, clockwise, indent) + "\n"
 	code += indent + "*/\n\n"
-	code += make_rules_code(dir, clockwise, indent) + "\n"
+	code += make_rules_code(dir, clockwise, indent)
 	return code
 
 
@@ -304,7 +305,9 @@ if False:
 	for clockwise in (True, False):
 		for dir in range(4):
 			indent = ' ' * 2
+			print('vvvvvvvvvvvvv')
 			print(make_trace_step_code(dir, clockwise, indent))
+			print('^^^^^^^^^^^^^')
 	exit()
 
 

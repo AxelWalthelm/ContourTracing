@@ -4,6 +4,18 @@
 #include <vector>
 #include "HighResolutionTimer.h"
 
+static bool TEST_expects_error = false;
+void TEST_ErrorHandler(const char* failed_expression, const char* error_message, const char* function_name, const char* file_name, int line_number)
+{
+	if (!error_message || !error_message[0])
+		error_message = "FEPCT_Assert failed";
+	if (!TEST_expects_error)
+		printf("%s: %s in function %s: %s(%d)\n", error_message, failed_expression, function_name, file_name, line_number);
+	throw std::exception(error_message);
+	exit(-1);
+}
+#define FEPCT_Assert(expr,msg) do { if(!!(expr)) ; else TEST_ErrorHandler(#expr, (msg), __func__, __FILE__, __LINE__ ); } while(0)
+
 /*
 Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" show that
 hand/script optimized code is (only) a few percent faster, especially on longer contours.
@@ -15,13 +27,21 @@ Other processors and architectures may benefit more from optimized code. (ARM, s
 
 static bool TEST_failed = false;
 
-void TEST_ErrorHandler(const char* failed_expression, const char* function_name, const char* file_name, int line_number)
+void TEST_FailHandler(const char* failed_expression, const char* function_name, const char* file_name, int line_number)
 {
 	TEST_failed = true;
 	printf("TEST failed: %s in function %s: %s(%d)\n", failed_expression, function_name, file_name, line_number);
 }
 
-#define TEST(expr) do { if(TEST_failed || !!(expr)) ; else TEST_ErrorHandler(#expr, __func__, __FILE__, __LINE__ ); } while(0)
+#define TEST(expr) do { if(TEST_failed || !!(expr)) ; else TEST_FailHandler(#expr, __func__, __FILE__, __LINE__ ); } while(0)
+
+struct TEST_ERROR_Guard
+{
+	TEST_ERROR_Guard() { TEST_expects_error = true; }
+	~TEST_ERROR_Guard() { TEST_expects_error = false; }
+};
+
+#define TEST_ERROR(code,message) do { TEST_ERROR_Guard _; if (!TEST_failed){ std::string error; try{ code; } catch(std::exception& x){ error = x.what(); } TEST(error == message); } } while(0)
 
 
 int getPixel(const cv::Mat& image, int x, int y, int border = -1)
@@ -191,6 +211,8 @@ double logBinUpperLimit(int bin)
 
 int main()
 {
+	std::srand(471142);
+
 #if false // test logBin
 	{
 		for (int i = -1; i < logBinsMax; i++)
@@ -216,7 +238,306 @@ int main()
 	}
 #endif
 
-	std::srand(471142);
+	// test some small cases
+	//////////////////////////
+
+	// empty image
+	{
+		{
+			cv::Mat image(0, 0, CV_8UC1);
+			std::vector<cv::Point> contour;
+			TEST_ERROR(FEPCT::findContour(contour, image, 0, 0, -1, false, false), "image is empty");
+		}
+		{
+			cv::Mat image(0, 9, CV_8UC1);
+			std::vector<cv::Point> contour;
+			TEST_ERROR(FEPCT::findContour(contour, image, 0, 0, -1, false, false), "image is empty");
+		}
+		{
+			cv::Mat image(9, 0, CV_8UC1);
+			std::vector<cv::Point> contour;
+			TEST_ERROR(FEPCT::findContour(contour, image, 0, 0, -1, false, false), "image is empty");
+		}
+	}
+
+	// seed pixel is outside of image
+	{
+		cv::Mat image(1, 1, CV_8UC1, cv::Scalar(255));
+		std::vector<cv::Point> contour;
+		TEST_ERROR(FEPCT::findContour(contour, image, 0, 2, -1, false, false), "seed pixel is outside of image");
+		TEST_ERROR(FEPCT::findContour(contour, image, 2, 0, -1, false, false), "seed pixel is outside of image");
+		TEST_ERROR(FEPCT::findContour(contour, image, 0, -2, -1, false, false), "seed pixel is outside of image");
+		TEST_ERROR(FEPCT::findContour(contour, image, -2, 0, -1, false, false), "seed pixel is outside of image");
+	}
+
+	// single pixel image
+	{
+		// zero is background
+		cv::Mat image(1, 1, CV_8UC1, cv::Scalar(0));
+		std::vector<cv::Point> contour;
+		TEST_ERROR(FEPCT::findContour(contour, image, 0, 0, -1, false, false), "seed pixel is not foreground");
+
+		// non-zero is foreground
+		setPixel(image, 0, 0, 1);
+		contour.clear();
+		FEPCT::stop_t stop;
+		FEPCT::findContour(contour, image, 0, 0, -1, false, false, &stop);
+		TEST(contour.size() == 1);
+		TEST(contour[0] == cv::Point(0, 0));
+		TEST(stop.max_contour_length == 1);
+		TEST(stop.dir == 0);
+		TEST(stop.x == 0);
+		TEST(stop.y == 0);
+
+		// suppress border
+		contour.clear();
+		stop = FEPCT::stop_t();
+		FEPCT::findContour(contour, image, 0, 0, -1, false, true, &stop);
+		TEST(contour.size() == 0);
+		TEST(stop.max_contour_length == 1);
+		TEST(stop.dir == 0);
+		TEST(stop.x == 0);
+		TEST(stop.y == 0);
+	}
+
+	// single pixel high image
+	{
+		// 5x1 image, 3 center pixels are set
+		cv::Mat image(1, 5, CV_8UC1, cv::Scalar(255));
+		setPixel(image, 0, 0, 0);
+		setPixel(image, 4, 0, 0);
+
+		// start in the middle
+		std::vector<cv::Point> contour;
+		FEPCT::stop_t stop;
+		FEPCT::findContour(contour, image, 2, 0, -1, false, false, &stop);
+		TEST(contour.size() == 4);
+		TEST(contour[0] == cv::Point(2, 0));
+		TEST(contour[1] == cv::Point(3, 0));
+		TEST(contour[2] == cv::Point(2, 0));
+		TEST(contour[3] == cv::Point(1, 0));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 1);
+		TEST(stop.x == 2);
+		TEST(stop.y == 0);
+
+		// suppress border
+		contour.clear();
+		stop = FEPCT::stop_t();
+		FEPCT::findContour(contour, image, 2, 0, -1, false, true, &stop);
+		TEST(contour.size() == 2);
+		TEST(contour[0] == cv::Point(3, 0));
+		TEST(contour[1] == cv::Point(1, 0));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 1);
+		TEST(stop.x == 2);
+		TEST(stop.y == 0);
+
+		// suppress border clockwise gives the same result
+		contour.clear();
+		stop = FEPCT::stop_t();
+		FEPCT::findContour(contour, image, 2, 0, -1, true, true, &stop);
+		TEST(contour.size() == 2);
+		TEST(contour[0] == cv::Point(3, 0));
+		TEST(contour[1] == cv::Point(1, 0));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 1);
+		TEST(stop.x == 2);
+		TEST(stop.y == 0);
+	}
+
+	// single pixel wide image
+	{
+		// 1x5 image, 3 center pixels are set
+		cv::Mat image(5, 1, CV_8UC1, cv::Scalar(255));
+		setPixel(image, 0, 0, 0);
+		setPixel(image, 0, 4, 0);
+
+		// start in the middle
+		std::vector<cv::Point> contour;
+		FEPCT::stop_t stop;
+		FEPCT::findContour(contour, image, 0, 2, -1, false, false, &stop);
+		TEST(contour.size() == 4);
+		TEST(contour[0] == cv::Point(0, 2));
+		TEST(contour[1] == cv::Point(0, 1));
+		TEST(contour[2] == cv::Point(0, 2));
+		TEST(contour[3] == cv::Point(0, 3));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 0);
+		TEST(stop.x == 0);
+		TEST(stop.y == 2);
+
+		// suppress border
+		contour.clear();
+		stop = FEPCT::stop_t();
+		FEPCT::findContour(contour, image, 0, 2, -1, false, true, &stop);
+		TEST(contour.size() == 2);
+		TEST(contour[0] == cv::Point(0, 1));
+		TEST(contour[1] == cv::Point(0, 3));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 0);
+		TEST(stop.x == 0);
+		TEST(stop.y == 2);
+
+		// suppress border clockwise gives the same result
+		contour.clear();
+		stop = FEPCT::stop_t();
+		FEPCT::findContour(contour, image, 0, 2, -1, true, true, &stop);
+		TEST(contour.size() == 2);
+		TEST(contour[0] == cv::Point(0, 1));
+		TEST(contour[1] == cv::Point(0, 3));
+		TEST(stop.max_contour_length == 4);
+		TEST(stop.dir == 0);
+		TEST(stop.x == 0);
+		TEST(stop.y == 2);
+	}
+
+	// 3x3 image
+	{
+		// bad seed pixel
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+
+			// start in the middle
+			std::vector<cv::Point> contour;
+			TEST_ERROR(FEPCT::findContour(contour, image, 1, 1, -1, false, false), "bad seed pixel");
+			TEST(contour.size() == 0);
+		}
+
+		// bad seed
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+
+			// start in the middle
+			std::vector<cv::Point> contour;
+			TEST_ERROR(FEPCT::findContour(contour, image, 1, 1, 0, false, false), "bad seed");
+			TEST(contour.size() == 0);
+		}
+
+		// upper-left corner is background
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+			setPixel(image, 0, 0, 0);
+
+			// start in the middle, trace clockwise, direction not given
+			std::vector<cv::Point> contour;
+			FEPCT::stop_t stop;
+			FEPCT::findContour(contour, image, 1, 1, -1, true, false, &stop);
+			TEST(contour.size() == 7);
+			TEST(contour[0] == cv::Point(1, 0));
+			TEST(contour[1] == cv::Point(2, 0));
+			TEST(contour[2] == cv::Point(2, 1));
+			TEST(contour[3] == cv::Point(2, 2));
+			TEST(contour[4] == cv::Point(1, 2));
+			TEST(contour[5] == cv::Point(0, 2));
+			TEST(contour[6] == cv::Point(0, 1));
+			TEST(stop.dir == 0);
+			TEST(stop.x == 1);
+			TEST(stop.y == 0);
+			TEST(stop.max_contour_length == 7);
+
+			// start in the middle, trace clockwise, direction given
+			contour.clear();
+			stop = FEPCT::stop_t();
+			FEPCT::findContour(contour, image, 1, 1, 0, true, false, &stop);
+			TEST(contour.size() == 7);
+			TEST(contour[0] == cv::Point(1, 0));
+			TEST(contour[1] == cv::Point(2, 0));
+			TEST(contour[2] == cv::Point(2, 1));
+			TEST(contour[3] == cv::Point(2, 2));
+			TEST(contour[4] == cv::Point(1, 2));
+			TEST(contour[5] == cv::Point(0, 2));
+			TEST(contour[6] == cv::Point(0, 1));
+			TEST(stop.dir == 0);
+			TEST(stop.x == 1);
+			TEST(stop.y == 0);
+			TEST(stop.max_contour_length == 7);
+
+			// start in the middle, trace clockwise
+			contour.clear();
+			stop = FEPCT::stop_t();
+			FEPCT::findContour(contour, image, 1, 1, -1, true, false, &stop);
+			TEST(contour.size() == 7);
+			TEST(contour[0] == cv::Point(1, 0));
+			TEST(contour[6] == cv::Point(0, 1));
+			TEST(stop.dir == 0);
+
+			// start in the middle, trace clockwise, suppress border
+			contour.clear();
+			stop = FEPCT::stop_t();
+			FEPCT::findContour(contour, image, 1, 1, 0, true, true, &stop);
+			TEST(contour.size() == 2);
+			TEST(contour[0] == cv::Point(1, 0));
+			TEST(contour[1] == cv::Point(0, 1));
+			TEST(stop.dir == 0);
+			TEST(stop.max_contour_length == 7);
+		}
+		// upper-right corner is background
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+			setPixel(image, 2, 0, 0);
+
+			// start in the middle, trace clockwise
+			std::vector<cv::Point> contour;
+			FEPCT::stop_t stop;
+			FEPCT::findContour(contour, image, 1, 1, -1, true, false, &stop);
+			TEST(contour.size() == 7);
+			TEST(stop.dir == 1);
+		}
+		// lower-right corner is background
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+			setPixel(image, 2, 2, 0);
+
+			// start in the middle, trace clockwise
+			std::vector<cv::Point> contour;
+			FEPCT::stop_t stop;
+			FEPCT::findContour(contour, image, 1, 1, -1, true, false, &stop);
+			TEST(contour.size() == 7);
+			TEST(stop.dir == 2);
+		}
+		// lower-left corner is background
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+			setPixel(image, 0, 2, 0);
+
+			// start in the middle, trace clockwise, determine start direction separately
+			std::vector<cv::Point> contour;
+			FEPCT::stop_t stop;
+			stop.max_contour_length = 0;
+			FEPCT::findContour(contour, image, 1, 1, -1, true, false, &stop);
+			TEST(contour.size() == 0);
+			TEST(stop.dir == 3);
+			TEST(stop.x == 0);
+			TEST(stop.y == 1);
+			TEST(stop.max_contour_length == 0);
+
+			// stop early using max_contour_length
+			contour.clear();
+			FEPCT::stop_t stop2;
+			stop2.max_contour_length = 6;
+			FEPCT::findContour(contour, image, 1, 1, stop.dir, true, false, &stop2);
+			TEST(contour.size() == 6);
+			TEST(stop2.dir == 3);
+
+			// stop early using (x, y, dir)
+			contour.clear();
+			stop2.max_contour_length = -1;
+			FEPCT::findContour(contour, image, 1, 1, stop.dir, true, false, &stop2);
+			TEST(contour.size() == 6);
+			TEST(stop2.dir == 3);
+		}
+	}
+
+	if (TEST_failed)
+	{
+		printf("TEST FAILED!\n");
+		return -1;
+	}
+
+	// compare results with OpenCV using randomly generated images
+	/////////////////////////////////////////////////////////////////
+
 	cv::Mat image(100, 200, CV_8UC1);
 
 	uint64_t duration_OpenCV = 0;
@@ -356,6 +677,21 @@ int main()
 		printf("time OpenCV: %11lld ns, %d pix, %lld ns/pix\n", duration_OpenCV, duration_OpenCV_count, duration_OpenCV / duration_OpenCV_count);
 		printf("time FEPCT:  %11lld ns, %d pix, %lld ns/pix\n", duration_FEPCT, duration_FEPCT_count, duration_FEPCT / duration_FEPCT_count);
 		printf("time ratio: %.3f\n", double(duration_FEPCT) / double(duration_OpenCV));
+
+		// Speed test on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 without GPU:
+		/*
+			0 (1): 165560900 ns, 296505 pix, 558 ns/pix
+			1 (2): 118987900 ns, 246920 pix, 481 ns/pix
+			2 (7): 588043300 ns, 1566531 pix, 375 ns/pix
+			3 (20): 434627300 ns, 1674345 pix, 259 ns/pix
+			4 (54): 337932400 ns, 2192311 pix, 154 ns/pix
+			5 (148): 238709100 ns, 2375023 pix, 100 ns/pix
+			6 (403): 93557000 ns, 1157859 pix, 80 ns/pix
+			7 (1096): 5608300 ns, 84840 pix, 66 ns/pix
+			time OpenCV:  3107149100 ns, 9594334 pix, 323 ns/pix
+			time FEPCT:   1983026200 ns, 9594334 pix, 206 ns/pix
+			time ratio: 0.638
+		*/
 
 		if (TEST_failed)
 			break;

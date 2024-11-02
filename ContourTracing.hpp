@@ -261,8 +261,8 @@ namespace FEPCT
 		const int height_m1 = height - 1;
 
 		const uint8_t* image_ptr = image.ptr(0, 0);
-		const int stride = int(image.ptr(1, 0) - image_ptr);
-		FEPCT_Assert(image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
+		const int stride = height == 1 ? width : int(image.ptr(1, 0) - image_ptr);
+		FEPCT_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
 		FEPCT_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
 		FEPCT_Assert(isForeground(x, y, image_ptr, width, height, stride), "seed pixel is not foreground");
@@ -324,6 +324,8 @@ namespace FEPCT
 						break;
 				}
 			}
+
+			FEPCT_Assert(dir < 4, "bad seed pixel");
 		}
 
 		if (isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride) &&
@@ -332,7 +334,7 @@ namespace FEPCT
 			moveForward(x, y, dir);
 		}
 
-		FEPCT_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "seed pixel has bad direction");
+		FEPCT_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed");
 		const int start_x = x;
 		const int start_y = y;
 		const int start_dir = dir;
@@ -559,9 +561,8 @@ namespace FEPCT
 						    dir = 1;
 						    // set pixel valid if left is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = x != 0;
+						        is_pixel_valid = y != 0;
 						}
-
 					}
 					else if (dir == 1)
 					{
@@ -632,9 +633,8 @@ namespace FEPCT
 						    dir = 2;
 						    // set pixel valid if left is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = y != 0;
+						        is_pixel_valid = x != width_m1;
 						}
-
 					}
 					else if (dir == 2)
 					{
@@ -705,9 +705,8 @@ namespace FEPCT
 						    dir = 3;
 						    // set pixel valid if left is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = x != width_m1;
+						        is_pixel_valid = y != height_m1;
 						}
-
 					}
 					else
 					{
@@ -779,9 +778,8 @@ namespace FEPCT
 						    dir = 0;
 						    // set pixel valid if left is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = y != height_m1;
+						        is_pixel_valid = x != 0;
 						}
-
 					}
 				} while (x != stop_x || y != stop_y || dir != stop_dir);
 			}
@@ -876,9 +874,8 @@ namespace FEPCT
 						    dir = 3;
 						    // set pixel valid if right is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = x != width_m1;
+						        is_pixel_valid = y != 0;
 						}
-
 					}
 					else if (dir == 1)
 					{
@@ -949,9 +946,8 @@ namespace FEPCT
 						    dir = 0;
 						    // set pixel valid if right is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = y != height_m1;
+						        is_pixel_valid = x != width_m1;
 						}
-
 					}
 					else if (dir == 2)
 					{
@@ -1022,9 +1018,8 @@ namespace FEPCT
 						    dir = 1;
 						    // set pixel valid if right is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = x != 0;
+						        is_pixel_valid = y != height_m1;
 						}
-
 					}
 					else
 					{
@@ -1096,20 +1091,22 @@ namespace FEPCT
 						    dir = 2;
 						    // set pixel valid if right is not border
 						    if (!is_pixel_valid)
-						        is_pixel_valid = y != 0;
+						        is_pixel_valid = x != 0;
 						}
-
 					}
 				} while (x != stop_x || y != stop_y || dir != stop_dir);
 			}
 
 #endif // FEPCT_GENERATOR_OPTIMIZED
 
-			if (contour_length == 0 && is_pixel_valid)
+			if (contour_length == 0)
 			{
 				// contour object is a single isolated pixel
-				contour.emplace_back(start_x, start_y);
-				++contour_length;
+				if (is_pixel_valid)
+				{
+					contour.emplace_back(start_x, start_y);
+				}
+				++contour_length; // contour_length is the unsuppressed length
 			}
 		}
 
