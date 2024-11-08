@@ -21,7 +21,7 @@ Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" show that
 hand/script optimized code is (only) a few percent faster, especially on longer contours.
 Other processors and architectures may benefit more from optimized code. (ARM, smaller RISC processors, ...?)
 */
-#define FEPCT_GENERATOR_OPTIMIZED 0
+#define FEPCT_GENERATOR_OPTIMIZED 1
 #include "ContourTracing.hpp"
 
 #include "ContourChainApproxSimple.hpp"
@@ -44,6 +44,37 @@ struct TEST_ERROR_Guard
 
 #define TEST_ERROR(code,message) do{TEST_ERROR_Guard _;if(!TEST_failed){bool throws=false;std::string error;try{code;}catch(std::exception&x){throws=true;error=x.what();}catch(...){throws=true;};TEST(throws && error == message);if(TEST_failed){if(throws)printf("Error: \"%s\".\n",error.c_str());else printf("No error.\n");}}}while(0)
 #define TEST_NO_ERROR(code) do{TEST_ERROR_Guard _;if(!TEST_failed){bool throws=false;std::string error;try{code;}catch(std::exception&x){throws=true;error=x.what();}catch(...){throws=true;};TEST(!throws);if(TEST_failed)printf("Error: \"%s\".\n",error.c_str());}}while(0)
+
+
+template <typename TData>
+bool is_contained(TData const& item, std::vector<TData> const& vector)
+{
+	return std::find(vector.begin(), vector.end(), item) != vector.end();
+}
+
+template <typename TData>
+bool have_equal_items(std::vector<TData> const& vector1, std::vector<TData> const& vector2)
+{
+	if (vector1.size() != vector2.size())
+		return false;
+
+	for (auto const& p: vector1)
+		if (!is_contained(p, vector2))
+			return false;
+
+	for (auto const& p: vector2)
+		if (!is_contained(p, vector1))
+			return false;
+
+	return true;
+}
+
+bool is_direct_neighbor_or_equal(cv::Point const& p1, cv::Point const& p2)
+{
+	int dx = std::abs(p1.x - p2.x);
+	int dy = std::abs(p1.y - p2.y);
+	return std::min(dx, dy) == 0 && std::max(dx, dy) <= 1;
+}
 
 
 int getPixel(const cv::Mat& image, int x, int y, int border = -1)
@@ -246,6 +277,7 @@ int main()
 	int turns = 666;
 
 	// empty image
+	if (!TEST_failed)
 	{
 		{
 			cv::Mat image(0, 0, CV_8UC1);
@@ -266,6 +298,7 @@ int main()
 	}
 
 	// seed pixel is outside of image
+	if (!TEST_failed)
 	{
 		cv::Mat image(1, 1, CV_8UC1, cv::Scalar(255));
 		std::vector<cv::Point> contour;
@@ -276,6 +309,7 @@ int main()
 	}
 
 	// single pixel image
+	if (!TEST_failed)
 	{
 		// zero is background
 		cv::Mat image(1, 1, CV_8UC1, cv::Scalar(0));
@@ -308,6 +342,7 @@ int main()
 	}
 
 	// single pixel high image
+	if (!TEST_failed)
 	{
 		// 5x1 image, 3 center pixels are set
 		cv::Mat image(1, 5, CV_8UC1, cv::Scalar(255));
@@ -369,6 +404,7 @@ int main()
 	}
 
 	// single pixel wide image
+	if (!TEST_failed)
 	{
 		// 1x5 image, 3 center pixels are set
 		cv::Mat image(5, 1, CV_8UC1, cv::Scalar(255));
@@ -418,6 +454,7 @@ int main()
 	}
 
 	// 3x3 image
+	if (!TEST_failed)
 	{
 		// bad seed pixel
 		{
@@ -563,7 +600,50 @@ int main()
 		}
 	}
 
+	// 5x5 inner contour
+	if (!TEST_failed)
+	{
+		cv::Mat image(5, 5, CV_8UC1, cv::Scalar(255));
+		setPixel(image, 2, 2, 0);
+
+		std::vector<cv::Point> expected_contour = { {2, 1}, {3, 2}, {2, 3}, {1, 2} };
+
+		for (int start_x = 1; start_x < 4; start_x++)
+		{
+			for (int start_y = 1; start_y < 4; start_y++)
+			{
+				if (start_x == 2 && start_y == 2)
+				{
+					std::vector<cv::Point> contour;
+					TEST_ERROR(turns = FEPCT::findContour(contour, image, start_x, start_y, -1, false, false), "seed pixel is not foreground");
+					continue;
+				}
+
+				// start in the middle, trace clockwise, determine start direction
+				{
+					std::vector<cv::Point> contour;
+					TEST_NO_ERROR(turns = FEPCT::findContour(contour, image, start_x, start_y, -1, true, false));
+					TEST(contour.size() == 4);
+					TEST(have_equal_items(contour, expected_contour));
+					TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
+					TEST(turns == -4); // inner contour
+				}
+
+				// start in the middle, trace counterclockwise, determine start direction
+				{
+					std::vector<cv::Point> contour;
+					TEST_NO_ERROR(turns = FEPCT::findContour(contour, image, start_x, start_y, -1, false, false));
+					TEST(contour.size() == 4);
+					TEST(have_equal_items(contour, expected_contour));
+					TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
+					TEST(turns == -4); // inner contour
+				}
+			}
+		}
+	}
+
 	// 7x7 spiral
+	if (!TEST_failed)
 	{
 		uint8_t data[7*7] = {
 			1, 1, 1, 1, 1, 1, 2,
