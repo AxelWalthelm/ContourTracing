@@ -225,7 +225,11 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('if ({})'.format(is_forward_border_code(dir)))
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
-	lines.append('    dir = {};'.format(turn_right(dir, clockwise)))
+	new_dir = turn_right(dir, clockwise)
+	lines.append('    dir = {};'.format(new_dir))
+	if (sorted([dir, new_dir]) == [0, 3]):
+		lines.append('    {}sum_of_turn_overflows;'.format('++' if (new_dir < dir) == clockwise else '--'))
+	#lines.append('    ++sum_of_turns;')
 	lines.append('}')
 	lines.append('// else if {0} is not border and forward-{0} pixel is foreground (rule 1)'.format(left))
 	lines.append('else if ({} && {})'.format(is_left_not_border_code(dir, clockwise),
@@ -236,7 +240,11 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('    // go to checked pixel');
 	lines += move_pixel_code_lines(forward_left_vector(dir, clockwise), '    ');
 	lines.append('    // turn {}'.format(left));
-	lines.append('    dir = {};'.format(turn_left(dir, clockwise)))
+	new_dir = turn_left(dir, clockwise)
+	lines.append('    dir = {};'.format(new_dir))
+	#lines.append('    --sum_of_turns;')
+	if (sorted([dir, new_dir]) == [0, 3]):
+		lines.append('    {}sum_of_turn_overflows;'.format('++' if (new_dir < dir) == clockwise else '--'))
 	lines.append('    // stop if buffer is full')
 	lines.append('    if (++contour_length >= max_contour_length)')
 	lines.append('        break;')
@@ -265,11 +273,14 @@ def make_rules_code(dir, clockwise, indent):
 	lines.append('else')
 	lines.append('{')
 	lines.append('    // turn {}'.format(right))
-	dir = turn_right(dir, clockwise)
-	lines.append('    dir = {};'.format(dir))
+	new_dir = turn_right(dir, clockwise)
+	lines.append('    dir = {};'.format(new_dir))
+	#lines.append('    ++sum_of_turns;')
+	if (sorted([dir, new_dir]) == [0, 3]):
+		lines.append('    {}sum_of_turn_overflows;'.format('++' if (new_dir < dir) == clockwise else '--'))
 	lines.append('    // set pixel valid if {} is not border'.format(left))
 	lines.append('    if (!is_pixel_valid)')
-	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(dir, clockwise)))
+	lines.append('        is_pixel_valid = {};'.format(is_left_not_border_code(new_dir, clockwise)))
 	lines.append('}')
 	return '\n'.join(indent + l for l in lines)
 

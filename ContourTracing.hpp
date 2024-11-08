@@ -13,7 +13,7 @@ Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.
 #include <limits.h>
 
 #ifndef FEPCT_GENERATOR_OPTIMIZED
-#define FEPCT_GENERATOR_OPTIMIZED 0
+#define FEPCT_GENERATOR_OPTIMIZED 1
 #endif
 
 /*
@@ -228,13 +228,13 @@ namespace FEPCT
 		// Sometimes it is useful to stop at another known position on the contour.
 		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!
 		// Out: (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached
+		int dir = -1;
 		int x;
 		int y;
-		int dir = -1;
 	};
 
-	// @param contour Receives the resulting contour points.
-	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
+	// @param contour Receives the resulting contour points. It should be initially empty if contour tracing starts new (but no check is done).
+	// TContour needs to implement a small sub-set of std::vector<cv::Point>:
 	//     void TContour::emplace_back(int x, int y)
 	//
 	// @param image Single channel 8 bit read access to the image to trace contour in.
@@ -244,8 +244,8 @@ namespace FEPCT
 	//     int TImage::cols; // number of columns, i.e. image width
 	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
 	// 
-	// @param x Start point x.
-	// @param y Start point y.
+	// @param x Seed pixel x coordinate.
+	// @param y Seed pixel y coordinate.
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
 	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
 	// to ensure the resulting contour is consistently 8-connected thin.
@@ -267,8 +267,16 @@ namespace FEPCT
 	// but not those pixel that only follow the border.
 	//
 	// @param stop Structure to control stop behavior and to return extra information on the state of tracing at the end.
+	//
+	// @return The total difference between left and right turns done during tracing.
+	// If a contour is traced completely, i.e. it is traced until it returns to the start edge,
+	// the value is 4 for an outer contour and -4 if it is an inner contour.
+	// When tracing stops due to stop.max_contour_length the contour is usually not traced completely.
+	// Even if all pixels have been found, up to 3 final edge tracing turns may not have been done,
+	// so if you somehow know that all pixels have been found, you can still use the sign of the return value
+	// to decide if it is an outer or inner contour.
 	template<typename TContour, typename TImage>
-	void findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
+	int findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
 		FEPCT_Assert(-1 <= dir && dir < 4, "seed direction is invalid");
 
@@ -372,6 +380,7 @@ namespace FEPCT
 			? std::min(stop->max_contour_length, upperLimitContourLength(width, height))
 			: upperLimitContourLength(width, height);
 		int contour_length = 0;
+		int sum_of_turns = 0;
 
 		// If do_suppress_border=true is_pixel_valid indicates if the current pixel has an edge
 		// on contour which is inside of the image, i.e. not only edges at image border.
@@ -429,6 +438,7 @@ namespace FEPCT
 					moveForward(x, y, dir);
 					moveLeft(x, y, dir, clockwise);
 					dir = turnLeft(dir, clockwise);
+					--sum_of_turns;
 					if (++contour_length >= max_contour_length)
 						break;
 					is_pixel_valid = true;
@@ -450,6 +460,7 @@ namespace FEPCT
 				else
 				{
 					dir = turnRight(dir, clockwise);
+					++sum_of_turns;
 					if (!is_pixel_valid)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
@@ -471,6 +482,8 @@ namespace FEPCT
 			const int off_pm = off_p0 + off_0m;
 			const int off_mp = off_m0 + off_0p;
 			const int off_mm = off_m0 + off_0m;
+
+			int sum_of_turn_overflows = 0;
 
 			if (clockwise)
 			{
@@ -548,6 +561,7 @@ namespace FEPCT
 						    --y;
 						    // turn left
 						    dir = 3;
+						    --sum_of_turn_overflows;
 						    // stop if buffer is full
 						    if (++contour_length >= max_contour_length)
 						        break;
@@ -753,6 +767,7 @@ namespace FEPCT
 						{
 						    // turn right
 						    dir = 0;
+						    ++sum_of_turn_overflows;
 						}
 						// else if left is not border and forward-left pixel is foreground (rule 1)
 						else if (y != height_m1 && pixel[off_mp] != 0)
@@ -795,6 +810,7 @@ namespace FEPCT
 						{
 						    // turn right
 						    dir = 0;
+						    ++sum_of_turn_overflows;
 						    // set pixel valid if left is not border
 						    if (!is_pixel_valid)
 						        is_pixel_valid = x != 0;
@@ -849,6 +865,7 @@ namespace FEPCT
 						{
 						    // turn left
 						    dir = 3;
+						    ++sum_of_turn_overflows;
 						}
 						// else if right is not border and forward-right pixel is foreground (rule 1)
 						else if (x != width_m1 && pixel[off_pm] != 0)
@@ -891,6 +908,7 @@ namespace FEPCT
 						{
 						    // turn left
 						    dir = 3;
+						    ++sum_of_turn_overflows;
 						    // set pixel valid if right is not border
 						    if (!is_pixel_valid)
 						        is_pixel_valid = y != 0;
@@ -1078,6 +1096,7 @@ namespace FEPCT
 						    --y;
 						    // turn right
 						    dir = 0;
+						    --sum_of_turn_overflows;
 						    // stop if buffer is full
 						    if (++contour_length >= max_contour_length)
 						        break;
@@ -1116,6 +1135,8 @@ namespace FEPCT
 				} while (x != stop_x || y != stop_y || dir != stop_dir);
 			}
 
+			sum_of_turns = sum_of_turn_overflows * 4 + (clockwise ? dir - start_dir : start_dir - dir);
+
 #endif // FEPCT_GENERATOR_OPTIMIZED
 
 			if (contour_length == 0)
@@ -1136,6 +1157,8 @@ namespace FEPCT
 			stop->y = y;
 			stop->dir = dir;
 		}
+
+		return sum_of_turns;
 	}
 
 } // namespace FEPCT
