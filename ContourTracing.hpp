@@ -233,21 +233,40 @@ namespace FEPCT
 		int dir = -1;
 	};
 
-	// If no direction dir is given (i.e. dir=-1) a direction is chosen automatically,
-	// which usually gives you what you expect, unless the object to trace is very narrow and the
-	// seed pixel is touching the contour on both sides, in which case tracing will start on the side with the smallest dir.
+	// @param contour Receives the resulting contour points.
+	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
+	//     void TContour::emplace_back(int x, int y)
+	//
+	// @param image Single channel 8 bit read access to the image to trace contour in.
+	// Pixel with non-zero value are foreground. All other pixels including those outside of image are background.
+	// TImage needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
+	//     int TImage::rows; // number of rows, i.e. image height
+	//     int TImage::cols; // number of columns, i.e. image width
+	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
+	// 
+	// @param x Start point x.
+	// @param y Start point y.
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
 	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
 	// to ensure the resulting contour is consistently 8-connected thin.
 	// The start pixel will be the first pixel in contour, unless it has only contour edges at the image border and do_suppress_border is set.
 	//
-	// TContour needs to implement a small sub-set of std::vector<cv::Point> and assumes that it is initially empty (but no check is done):
-	//     void TContour::emplace_back(int x, int y);
+	// @param dir Direction to start contour tracing with. 0 is up, 1 is right, 2 is down, 3 is left.
+	// If value is -1, no direction dir is given and a direction is chosen automatically,
+	// which usually gives you what you expect, unless the object to trace is very narrow and the
+	// seed pixel is touching the contour on both sides, in which case tracing will start on the side with the smallest dir.
 	//
-	// TImage needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
-	//     int TImage::rows; // number of rows, i.e. image height
-	//     int TImage::cols; // number of columns, i.e. image width
-	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
+	// @param clockwise Indicates if outer contours are traced clockwise or counterclockwise.
+	// Note that inner contours run in the opposite direction.
+	// If tracing is clockwise, the traced edge is to the left of the current pixel (looking in the current direction),
+	// otherwise the traced edge is to the right.
+	// Set it to false to trace similar to OpenCV cv::findContours.
+	//
+	// @param do_suppress_border Indicates to omit pixels of the contour that are followed on border edges only.
+	// The contour still contains border pixels where it arrives at the image border or where it leaves tha image border,
+	// but not those pixel that only follow the border.
+	//
+	// @param stop Structure to control stop behavior and to return extra information on the state of tracing at the end.
 	template<typename TContour, typename TImage>
 	void findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{

@@ -4,6 +4,7 @@
     <ClInclude Include="ContourTracing.hpp" />
     <ClInclude Include="ContourTracingGeneratorTemplate.hpp" />
     <ClInclude Include="HighResolutionTimer.h" />
+    <ClInclude Include="ContourChainApproxSimple.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ContourTracingGenerator.py" />

@@ -166,6 +166,7 @@
     <ClCompile Include="HighResolutionTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ContourChainApproxSimple.hpp" />
     <ClInclude Include="ContourTracing.hpp" />
     <ClInclude Include="HighResolutionTimer.h" />
     <Text Include="ContourTracingGeneratorTemplate.hpp">
