@@ -4,6 +4,11 @@
 #include <vector>
 #include "HighResolutionTimer.h"
 
+#define SAVE_IMAGES 0
+#if SAVE_IMAGES
+#include <direct.h>
+#endif
+
 static bool TEST_expects_error = false;
 void TEST_ErrorHandler(const char* failed_expression, const char* error_message, const char* function_name, const char* file_name, int line_number)
 {
@@ -76,6 +81,16 @@ bool is_direct_neighbor_or_equal(cv::Point const& p1, cv::Point const& p2)
 	return std::min(dx, dy) == 0 && std::max(dx, dy) <= 1;
 }
 
+template<typename ... Args>
+std::string string_format(const std::string& format, Args ... args)
+{
+	int size = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1;
+	if( size <= 0 )
+		throw std::runtime_error( "string_format error" );
+	std::unique_ptr<char[]> buf( new char[ size_t(size) ] );
+	std::snprintf( buf.get(), size_t(size), format.c_str(), args ... );
+	return std::string( buf.get(), buf.get() + size_t(size) - 1 );
+}
 
 int getPixel(const cv::Mat& image, int x, int y, int border = -1)
 {
@@ -204,7 +219,43 @@ bool TEST_showFailed(cv::Mat& image, const std::vector<cv::Point>& contour, cons
 	if (!TEST_failed)
 		return false;
 
+	TEST_showFailed(image, contour, expected_contour, contour_index, do_animate_both);
+	return true;
+}
+
+void TEST_show(cv::Mat& image, const std::vector<cv::Point>& contour, const std::vector<cv::Point>& expected_contour, int contour_index, bool do_animate_both = false
+#if SAVE_IMAGES
+	, std::string save_path = "", bool do_crop = false
+#endif
+)
+{
 	printf("  contour_index=%d traced %d of %d\n", contour_index, int(contour.size()), int(expected_contour.size()));
+
+#if SAVE_IMAGES
+
+	cv::Rect roi;
+	if (do_crop)
+	{
+		cv::Rect bbx1 = cv::boundingRect(contour);
+		cv::Rect bbx2 = cv::boundingRect(expected_contour);
+		std::vector<cv::Point> points = { bbx1.tl(), bbx1.br(), bbx2.tl(), bbx2.br() };
+		roi = cv::boundingRect(points);
+
+		int border = 5;
+		roi -= cv::Point(border, border);
+		roi += cv::Size(2 * border, 2 * border);
+
+		roi &= cv::Rect(0, 0, image.cols, image.rows);
+	}
+
+	if (!save_path.empty())
+	{
+		int status = _mkdir(save_path.c_str()); // must not exist - delete old folder before new run
+		if (status != 0)
+			throw std::exception("_mkdir failed");
+	}
+
+#endif
 
 	for (int i = -1; i < int(std::max(expected_contour.size(), contour.size())); i++)
 	{
@@ -213,14 +264,36 @@ bool TEST_showFailed(cv::Mat& image, const std::vector<cv::Point>& contour, cons
 
 		drawContourTransparent(display, expected_contour, cv::Scalar(0, 255, 0), do_animate_both && i >= 0 ? i + 1 : -1);
 		drawContourTransparent(display, contour, cv::Scalar(0, 0, 255), i + 1);
+
+#if SAVE_IMAGES
+		if (do_crop)
+			display = cv::Mat(display, roi);
+#endif
+
 		cv::namedWindow("display", cv::WINDOW_NORMAL);
 		cv::imshow("display", display);
-		int key = cv::waitKey();
-		if (key < 0 || key == 27)
-			break;
-	}
 
-	return true;
+#if SAVE_IMAGES
+		if (!save_path.empty())
+		{
+			int f = std::min(5, 1024 / display.cols);
+			if (f > 0)
+				cv::resize(display, display, cv::Size(), f, f, cv::INTER_NEAREST);
+			bool ok = cv::imwrite(save_path + string_format("\\image%05d.png", i + 1), display);
+			if (!ok)
+				throw std::exception("imwrite failed");
+#ifndef NDEBUG
+			cv::waitKey(100);
+#endif
+		}
+		else
+#endif
+		{
+			int key = cv::waitKey();
+			if (key < 0 || key == 27)
+				break;
+		}
+	}
 }
 
 constexpr int logBinsMax = 711;  // logBin(std::numeric_limits<double>().max())+1
@@ -803,6 +876,10 @@ int main()
 
 		setRandom(image);
 
+#if SAVE_IMAGES
+		cv::imwrite(string_format("C:\\tmp\\test-image-%05d.png", test), image);
+#endif
+
 		std::vector<std::vector<cv::Point>> contours;
 		std::vector<cv::Vec4i> hierarchy;
 		HighResolutionTime_t timer_start = GetHighResolutionTime();
@@ -845,6 +922,21 @@ int main()
 				TEST(stop.max_contour_length == (test_stop ? int(expected_contour.size()) : -1));
 
 				TEST(turns == (is_outer ? 4 : -4));
+
+#if SAVE_IMAGES
+				static size_t max_size[2] = { 3, 9 };
+				if (max_size[is_outer] < contour.size())
+				{
+					max_size[is_outer] = contour.size();
+					printf("max_size[%d]=%zd\n", int(is_outer), max_size[is_outer]);
+					TEST_show(image, contour, expected_contour, contour_index, false, string_format("C:\\tmp\\%s-contour-%05zd", is_outer ? "outer" : "inner", max_size[is_outer]));
+					TEST_show(image, contour, expected_contour, contour_index, false, string_format("C:\\tmp\\%s-contour-%05zd-cropped", is_outer ? "outer" : "inner", max_size[is_outer]), true);
+
+					// Examples to generate animated PNG:
+					// ffmpeg.exe -framerate 5 -i image%05d.png -plays 0 -final_delay 2.0 -f apng -lavfi split[v],palettegen,[v]paletteuse out.apng
+					// for /d %d in (C:\tmp\inner-contour-* C:\tmp\outer-contour-*) do ffmpeg.exe -framerate 5 -i %d\image%05d.png -plays 0 -final_delay 2.0 -f apng -lavfi split[v],palettegen,[v]paletteuse %d\..\%~nxd.apng
+			}
+#endif
 
 				if (TEST_showFailed(image, contour, expected_contour, contour_index))
 					break;
@@ -1001,7 +1093,7 @@ int main()
 		printf("time FEPCT:  %11lld ns, %d pix, %lld ns/pix\n", duration_FEPCT, duration_FEPCT_count, duration_FEPCT / duration_FEPCT_count);
 		printf("time ratio: %.3f\n", double(duration_FEPCT) / double(duration_OpenCV));
 
-		// Speed test on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 without GPU:
+		// Speed test on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 without GPU and compiled with Visual Studio Community 2015:
 		/*
 			0 (1): 165560900 ns, 296505 pix, 558 ns/pix
 			1 (2): 118987900 ns, 246920 pix, 481 ns/pix
