@@ -1,13 +1,34 @@
 # Fast Edge-Based Pixel Contour Tracing from Seed Point
 
+Implementation of my Algorithm to trace contours in binary images in C++ in a way that is compatible with OpenCV contour functionality.
+
 ## Introduction
 
-TODO
+[Wikipedia](https://en.wikipedia.org/wiki/Boundary_tracing) also calls it "boundary tracing".
+
+
+It is also known as "border following" or "boundary following" according to
+the
+[Online Tutorial](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/index.html)
+published by Abeer George Ghuneim.
+
+An interesting overview is presented in the paper ["Fast Contour-Tracing Algorithm Based on a Pixel-Following Method for Image Sensors"](https://pmc.ncbi.nlm.nih.gov/articles/PMC4813928/) published 2016 by Jonghoon Seo, Seungho Chae, Jinwook Shim, Dongchul Kim, Cheolho Cheong, and Tack-Don Han.
+
+[OpenCV]()
+has a function
+[cv::findContours()](https://docs.opencv.org/4.10.0/d3/dc0/group__imgproc__shape.html#gadf1ad6a0b82947fa1fe3c3d497f260e0)
+that implements several algorithms to trace all 8-connected contours in a binary image. Its usage is described in this [tutorial](https://docs.opencv.org/4.10.0/df/d0d/tutorial_find_contours.html).
+
+I was not able to find a free C/C++ implementation of a function that traces a single contour starting from a seed point. After getting tired of searching the internet, I did my own, published it here, and I guess it may be better than many other implementations. This topic has been researched for decades, much of it in the bad old days when "paper with code" was unknown and papers were hidden behind pay-walls or not online at all. The key words to search by were different, and they probably are in patent lawyer language, so it is hard to know for sure. But my implementation is online, it is fast, and it is tested against OpenCV.
+
+The basic idea is to trace along edges instead of jumping from pixel to pixel following not always very intuitive rules. We follow along the border lines of the current pixel and the background and decide onto which edge we will go next. So at every corner where four pixels join, we have to decide: go left, go forward, or go right. Only three options. And once we have decided that the foreground is 8-connected, the contour line is clearly defined and easy to follow. However we do not output the edges we travel on, we only emit the foreground pixels we encounter on this journey. That's all, basically.
+
+The resulting algorithm is quite similar to Theo Pavlidis' Algorithm, but it is simpler, does fewer pixel tests, and it can start on any pixel of the contour.
 
 ## Function
 
 The contour tracing function is implemented in ContourTracing.hpp mostly using C style.
-It is a C++ template function to allow it to be easliy used with OpenCV and STL,
+It is a C++ template function to allow it to be easily used with OpenCV and STL,
 but turning it into a pure C function should be easy enough.
 
 ```
@@ -141,6 +162,18 @@ else (rule 3)
 In case of counterclockwise tracing the rules are the same except that left and right are exchanged.
 ```
 
+## Comparison with Theo Pavlidis' Algorithm
+
+The book
+["Algorithms for Graphics and Image Processing"](https://doi.org/10.1007/978-3-642-93208-3)
+from 1982 is not online, but there is a nice description of
+[Theo Pavlidis' Algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theo.html)
+by A. Ghuneim.
+
+TODO
+
+According to the GitHub project [geocontour](https://github.com/benkrichman/geocontour) Pavlidis' algorithm has problems "capturing inside corners".
+
 ## Performance
 
 The inner loop of contour tracing is optionally unrolled and optimized for speed.
@@ -247,26 +280,26 @@ The current implementation does not support it.
 To trace contour pixel of a 4-connected foreground area, the rules need to be changed.
 For clockwise tracing they could become something like:
 ```
-	if forward pixel is not foreground
-		turn right
-	else if forward-left pixel is foreground
-		turn left
-	else
-		move ahead 
+if forward pixel is not foreground
+    turn right
+else if forward-left pixel is foreground
+    turn left
+else
+    move ahead 
 ```
 
 Pixel emission would also change a little. Rules could be like:
 ```
-	if forward pixel is not foreground
-		turn right
-	else if forward-left pixel is foreground
-		emit current pixel
-        emit foward pixel (only if you want a 4-connected contour)
-        move to forward-left pixel
-        turn left
-	else
-		emit current pixel
-        move ahead
+if forward pixel is not foreground
+    turn right
+else if forward-left pixel is foreground
+    emit current pixel
+    emit forward pixel (only if you want a 4-connected contour)
+    move to forward-left pixel
+    turn left
+else
+    emit current pixel
+    move ahead
 ```
 
 For counterclockwise tracing the rules change similarly in that left is swapped with right.
