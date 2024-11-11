@@ -6,7 +6,11 @@
 
 #define SAVE_IMAGES 0
 #if SAVE_IMAGES
+#ifdef _WIN32
 #include <direct.h>
+#else
+#error "TODO: define _mkdir"
+#endif
 #endif
 
 static bool TEST_expects_error = false;

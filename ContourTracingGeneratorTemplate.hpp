@@ -1,4 +1,8 @@
 #pragma once
+//
+// Copyright 2024 Axel Walthelm
+//
+
 //o__#__o//
 //o__#__o// This is a template file using generator macros starting with "o__" and ending with "__o".
 //o__#__o//

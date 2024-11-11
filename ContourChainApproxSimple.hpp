@@ -1,7 +1,11 @@
 #pragma once
+//
+// Copyright 2024 Axel Walthelm
+//
+
 #include <algorithm>
 
-// A filtering container that can be used with findContour to create contours like OpenCV does with option cv::CHAIN_APPROX_SIMPLE.
+// A filtering container that can be used with FECT::findContour to create contours like OpenCV does with option cv::CHAIN_APPROX_SIMPLE.
 // If successive points are on a vertical, horizontal, or diagonal line, only start and end point of the line are stored.
 // Successive points are expected to be 8-connected neighbors. If they are not, they are not filtered out.
 // Since some data needs to be buffered while filtering the contour, the result must be accessed only after all points were added.
@@ -9,7 +13,7 @@
 //
 // Example:
 //   ContourChainApproxSimple<std::vector<cv::Point>> contour;
-//   FECT::findContour(contour, image, start.x, start.y, -1, false, false);
+//   FECT::findContour(contour, image, start.x, start.y, -1);
 //   std::vector<cv::Point>& contour_points = contour.get();
 //   if (contour.do_suppress_start())
 //       contour_points.erase(contour_points.begin());

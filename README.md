@@ -1,6 +1,6 @@
 # Fast Edge-Oriented Contour Tracing from Seed-Pixel (FECTS)
 
-Implementation of my Algorithm to trace contours in binary images in C++ in a way that is compatible with OpenCV contour functionality.
+C++ implementation of my Algorithm to trace contours in binary images in a way that is compatible with OpenCV contour functionality.
 
 ## Introduction
 
@@ -41,18 +41,18 @@ int findContour(
     stop_t* stop = NULL) // optional advanced termination control
 ```
 
-**contour:** Receives the resulting contour points. It should be initially empty if contour tracing starts new (but no check is done).
+**contour:** Receives the resulting contour points. It should be initially empty if contour tracing starts new (but no check is done).  
 **TContour** needs to implement a small sub-set of std::vector&lt;cv::Point&gt;:
 ```
-    void TContour::emplace_back(int x, int y)
+void TContour::emplace_back(int x, int y)
 ```
 **image:** Single channel 8 bit read access to the image to trace contour in.
-Pixel with non-zero value are foreground. All other pixels including those outside of image are background.
+Pixel with non-zero value are foreground. All other pixels including those outside of image are background.  
 **TImage** needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
 ```
-    int TImage::rows; // number of rows, i.e. image height
-    int TImage::cols; // number of columns, i.e. image width
-    uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
+int TImage::rows; // number of rows, i.e. image height
+int TImage::cols; // number of columns, i.e. image width
+uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
 ```
 **x, y:** Seed pixel coordinate.
 Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
@@ -274,9 +274,43 @@ Some examples for inner contours:
 ![Example](./README/test/examples/inner-contour-00004-cropped.apng)
 
 
+## Compress Contours like cv::CHAIN_APPROX_SIMPLE
+
+If you need fast on-the-fly post-processing of the contour, you should consider to implement a filtering container instead of modifying the algorithm code.
+
+ContourChainApproxSimple.hpp implements an example of a filtering container:
+
+```
+template<typename TVector>
+class ContourChainApproxSimple
+```
+TVector needs to implement a small sub-set of std::vector:
+```
+void TVector::emplace_back(int x, int y)
+```
+
+It can be used to create contours like OpenCV does with option [cv::CHAIN_APPROX_SIMPLE](https://docs.opencv.org/4.10.0/d3/dc0/group__imgproc__shape.html#ga4303f45752694956374734a03c54d5ff).
+
+If successive points are on a vertical, horizontal, or diagonal line, only start and end point of the line are stored.
+Since some data needs to be buffered while filtering the contour, the result must be accessed only after all points were added.
+Start point will always be first point in the resulting contour, but you can query if it could be suppressed and do it yourself.
+
+
+Example:
+```
+ContourChainApproxSimple<std::vector<cv::Point>> contour;
+FECT::findContour(contour, image, start.x, start.y, -1);
+std::vector<cv::Point>& contour_points = contour.get();
+if (contour.do_suppress_start())
+    contour_points.erase(contour_points.begin());
+```
+
+ContourTracingTest.cpp contains tests for ContourChainApproxSimple.
+
 ## Tracing contour of a 4-connected object
 
 The current implementation does not support it.
+
 To trace contour pixel of a 4-connected foreground area, the rules need to be changed.
 For clockwise tracing they could become something like:
 ```

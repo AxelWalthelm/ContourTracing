@@ -1,4 +1,8 @@
 #pragma once
+//
+// Copyright 2024 Axel Walthelm
+//
+
 /*
 #############################################################################
 # WARNING: this code was generated - do not edit, your changes may get lost #

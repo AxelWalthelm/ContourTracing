@@ -1,4 +1,8 @@
 #pragma once
+//
+// Copyright 2024 Axel Walthelm
+//
+
 #include <stdint.h>
 
 typedef uint64_t HighResolutionTime_t;

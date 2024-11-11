@@ -1,6 +1,11 @@
+//
+// Copyright 2024 Axel Walthelm
+//
+
 #include "HighResolutionTimer.h"
+
+#ifdef _WIN32
 #include <windows.h>
-#include <immintrin.h>
 #include <stdexcept>
 
 
@@ -35,3 +40,7 @@ uint64_t GetHighResolutionTimeElapsedNs(HighResolutionTime_t start)
 {
 	return GetHighResolutionTimeElapsedNs(start, GetHighResolutionTime());
 }
+
+#else
+#error "TODO: implement HighResolutionTimer"
+#endif
