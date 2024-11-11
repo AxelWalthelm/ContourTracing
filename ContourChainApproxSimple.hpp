@@ -9,7 +9,7 @@
 //
 // Example:
 //   ContourChainApproxSimple<std::vector<cv::Point>> contour;
-//   FEPCT::findContour(contour, image, start.x, start.y, -1, false, false);
+//   FECT::findContour(contour, image, start.x, start.y, -1, false, false);
 //   std::vector<cv::Point>& contour_points = contour.get();
 //   if (contour.do_suppress_start())
 //       contour_points.erase(contour_points.begin());

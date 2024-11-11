@@ -12,13 +12,13 @@ Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.
 #include <stdint.h>
 #include <limits.h>
 
-#ifndef FEPCT_GENERATOR_OPTIMIZED
-#define FEPCT_GENERATOR_OPTIMIZED 1
+#ifndef FECTS_GENERATOR_OPTIMIZED
+#define FECTS_GENERATOR_OPTIMIZED 1
 #endif
 
 /*
- Fast Edge-Based Pixel Contour Tracing from Seed Point
-=======================================================
+ Fast Edge-Oriented Contour Tracing from Seed-Point (FECTS)
+============================================================
 
 TODO
 
@@ -71,7 +71,7 @@ Maybe your application would work better with eroding the inverted mask a little
 but it still wouldn't be exactly the same result in the end.
 */
 
-namespace FEPCT
+namespace FECTS
 {
 	// Upper limit of contour length is used to prevent infinite loop and out-of-memory crash
 	// if stop criteria is incorrect.
@@ -104,15 +104,15 @@ namespace FEPCT
 
 	namespace
 	{
-#ifndef FEPCT_Assert
+#ifndef FECTS_Assert
 		void defaultErrorHandler(const char* failed_expression, const char* error_message, const char* function_name, const char* file_name, int line_number)
 		{
 			if (!error_message || !error_message[0])
-				error_message = "FEPCT_Assert failed";
+				error_message = "FECTS_Assert failed";
 			printf("%s: %s in function %s: %s(%d)\n", error_message, failed_expression, function_name, file_name, line_number);
 			exit(-1);
 		}
-#define FEPCT_Assert(expr,msg) do { if(!!(expr)) ; else defaultErrorHandler(#expr, (msg), __func__, __FILE__, __LINE__ ); } while(0)
+#define FECTS_Assert(expr,msg) do { if(!!(expr)) ; else defaultErrorHandler(#expr, (msg), __func__, __FILE__, __LINE__ ); } while(0)
 #endif
 
 		constexpr int dx[] = {0, 1, 0, -1};
@@ -278,21 +278,21 @@ namespace FEPCT
 	template<typename TContour, typename TImage>
 	int findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
-		FEPCT_Assert(-1 <= dir && dir < 4, "seed direction is invalid");
+		FECTS_Assert(-1 <= dir && dir < 4, "seed direction is invalid");
 
 		// image properties
 		const int width = image.cols;
 		const int height = image.rows;
-		FEPCT_Assert(width > 0 && height > 0, "image is empty");
+		FECTS_Assert(width > 0 && height > 0, "image is empty");
 		const int width_m1 = width - 1;
 		const int height_m1 = height - 1;
 
 		const uint8_t* image_ptr = image.ptr(0, 0);
 		const int stride = height == 1 ? width : int(image.ptr(1, 0) - image_ptr);
-		FEPCT_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
+		FECTS_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
-		FEPCT_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
-		FEPCT_Assert(isForeground(x, y, image_ptr, width, height, stride), "seed pixel is not foreground");
+		FECTS_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
+		FECTS_Assert(isForeground(x, y, image_ptr, width, height, stride), "seed pixel is not foreground");
 
 		if (dir == -1)
 		{
@@ -352,7 +352,7 @@ namespace FEPCT
 				}
 			}
 
-			FEPCT_Assert(dir < 4, "bad seed pixel");
+			FECTS_Assert(dir < 4, "bad seed pixel");
 		}
 
 		if (isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride) &&
@@ -361,7 +361,7 @@ namespace FEPCT
 			moveForward(x, y, dir);
 		}
 
-		FEPCT_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed");
+		FECTS_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed");
 		const int start_x = x;
 		const int start_y = y;
 		const int start_dir = dir;
@@ -369,8 +369,8 @@ namespace FEPCT
 		const bool is_stop_in = stop != NULL && stop->dir >= 0 && stop->dir < 4;
 		if (is_stop_in)
 		{
-			FEPCT_Assert(isForeground(stop->x, stop->y, image_ptr, width, height, stride), "stop pixel is not foreground");
-			FEPCT_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise, image_ptr, width, height, stride), "stop pixel has bad direction");
+			FECTS_Assert(isForeground(stop->x, stop->y, image_ptr, width, height, stride), "stop pixel is not foreground");
+			FECTS_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise, image_ptr, width, height, stride), "stop pixel has bad direction");
 		}
 		const int stop_x = is_stop_in ? stop->x : start_x;
 		const int stop_y = is_stop_in ? stop->y : start_y;
@@ -391,7 +391,7 @@ namespace FEPCT
 		if (max_contour_length > 0)
 		{
 
-#if !FEPCT_GENERATOR_OPTIMIZED
+#if !FECTS_GENERATOR_OPTIMIZED
 
 			/*
 			clockwise rules:
@@ -1137,7 +1137,7 @@ namespace FEPCT
 
 			sum_of_turns = sum_of_turn_overflows * 4 + (clockwise ? dir - start_dir : start_dir - dir);
 
-#endif // FEPCT_GENERATOR_OPTIMIZED
+#endif // FECTS_GENERATOR_OPTIMIZED
 
 			if (contour_length == 0)
 			{
@@ -1161,4 +1161,4 @@ namespace FEPCT
 		return sum_of_turns;
 	}
 
-} // namespace FEPCT
+} // namespace FECTS

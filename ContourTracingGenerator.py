@@ -8,7 +8,7 @@ output_file = os.path.join(directory, 'ContourTracing.hpp')
 
 print('ContourTracingGenerator.py -> {}'.format(output_file))
 
-namespace = "FEPCT"
+namespace = "FECTS"
 
 warning_generated_code = """
 #############################################################################
@@ -18,8 +18,8 @@ Consider to edit {} and {} instead.
 """.strip('\n').format(os.path.basename(__file__), os.path.basename(template_file))
 
 introduction = """
- Fast Edge-Based Pixel Contour Tracing from Seed Point
-=======================================================
+ Fast Edge-Oriented Contour Tracing from Seed-Point (FECTS)
+============================================================
 
 TODO
 

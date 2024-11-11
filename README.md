@@ -1,4 +1,4 @@
-# Fast Edge-Based Pixel Contour Tracing from Seed Point
+# Fast Edge-Oriented Contour Tracing from Seed-Pixel (FECTS)
 
 Implementation of my Algorithm to trace contours in binary images in C++ in a way that is compatible with OpenCV contour functionality.
 
@@ -19,11 +19,11 @@ has a function
 [cv::findContours()](https://docs.opencv.org/4.10.0/d3/dc0/group__imgproc__shape.html#gadf1ad6a0b82947fa1fe3c3d497f260e0)
 that implements several algorithms to trace all 8-connected contours in a binary image. Its usage is described in this [tutorial](https://docs.opencv.org/4.10.0/df/d0d/tutorial_find_contours.html).
 
-I was not able to find a free C/C++ implementation of a function that traces a single contour starting from a seed point. After getting tired of searching the internet, I did my own, published it here, and I guess it may be better than many other implementations. This topic has been researched for decades, much of it in the bad old days when "paper with code" was unknown and papers were hidden behind pay-walls or not online at all. The key words to search by were different, and they probably are in patent lawyer language, so it is hard to know for sure. But my implementation is online, it is fast, and it is tested against OpenCV.
+I was not able to find a free C/C++ implementation of a function that traces a single contour starting from a seed point. After getting tired of searching the internet, I did my own, published it here, and I guess it may be better than many other implementations. This topic has been researched for decades, much of it in the bad old days when "paper with code" was unheard of and papers were hidden behind pay-walls or not online at all. The key words for searching were different, and they probably are different again in patent lawyer language, so it is hard to know for sure. But my implementation is online, it is fast, and it is tested against OpenCV.
 
-The basic idea is to trace along edges instead of jumping from pixel to pixel following not always very intuitive rules. We follow along the border lines of the current pixel and the background and decide onto which edge we will go next. So at every corner where four pixels join, we have to decide: go left, go forward, or go right. Only three options. And once we have decided that the foreground is 8-connected, the contour line is clearly defined and easy to follow. However we do not output the edges we travel on, we only emit the foreground pixels we encounter on this journey. That's all, basically.
+The basic idea is to trace along edges instead of jumping from pixel to pixel following not always very intuitive rules. We follow along the border lines of the current foreground pixel and the background and decide onto which edge we will go next. So at every corner junction where four pixels join, we have to decide: go left, go forward, or go right. Only three options. And once we have defined that the foreground is 8-connected, the contour line is clearly defined and easy to follow. However we do not output the edges we travel on, we only emit the foreground pixels we encounter on this journey. The tracing is finished when we reach the start edge again. That's all, basically.
 
-The resulting algorithm is quite similar to Theo Pavlidis' Algorithm, but it is simpler, does fewer pixel tests, and it can start on any pixel of the contour.
+The resulting algorithm is quite similar to Theo Pavlidis' algorithm, but it is simpler, does fewer pixel tests, and it can start on any pixel of the contour.
 
 ## Function
 
@@ -167,7 +167,7 @@ In case of counterclockwise tracing the rules are the same except that left and 
 The book
 ["Algorithms for Graphics and Image Processing"](https://doi.org/10.1007/978-3-642-93208-3)
 from 1982 is not online, but there is a nice description of
-[Theo Pavlidis' Algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theo.html)
+[Theo Pavlidis' algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theo.html)
 by A. Ghuneim.
 
 TODO
