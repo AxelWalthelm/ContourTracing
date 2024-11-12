@@ -685,36 +685,96 @@ int main()
 
 		std::vector<cv::Point> expected_contour = { {2, 1}, {3, 2}, {2, 3}, {1, 2} };
 
-		for (int start_x = 1; start_x < 4; start_x++)
+		// correction of start point is also working for inner contours
 		{
-			for (int start_y = 1; start_y < 4; start_y++)
+			for (int start_x = 1; start_x < 4; start_x++)
 			{
-				if (start_x == 2 && start_y == 2)
+				for (int start_y = 1; start_y < 4; start_y++)
 				{
-					std::vector<cv::Point> contour;
-					TEST_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, false, false), "seed pixel is not foreground");
-					continue;
-				}
+					if (start_x == 2 && start_y == 2)
+					{
+						std::vector<cv::Point> contour;
+						TEST_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, false, false), "seed pixel is not foreground");
+						continue;
+					}
 
-				// start in the middle, trace clockwise, determine start direction
-				{
-					std::vector<cv::Point> contour;
-					TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, true, false));
-					TEST(contour.size() == 4);
-					TEST(have_equal_items(contour, expected_contour));
-					TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
-					TEST(turns == -4); // inner contour
-				}
+					// start in the middle, trace clockwise, determine start direction
+					{
+						std::vector<cv::Point> contour;
+						TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, true, false));
+						TEST(contour.size() == 4);
+						TEST(have_equal_items(contour, expected_contour));
+						TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
+						TEST(turns == -4); // inner contour
+					}
 
-				// start in the middle, trace counterclockwise, determine start direction
-				{
-					std::vector<cv::Point> contour;
-					TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, false, false));
-					TEST(contour.size() == 4);
-					TEST(have_equal_items(contour, expected_contour));
-					TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
-					TEST(turns == -4); // inner contour
+					// start in the middle, trace counterclockwise, determine start direction
+					{
+						std::vector<cv::Point> contour;
+						TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, -1, false, false));
+						TEST(contour.size() == 4);
+						TEST(have_equal_items(contour, expected_contour));
+						TEST(is_direct_neighbor_or_equal(contour[0], cv::Point(start_x, start_y)));
+						TEST(turns == -4); // inner contour
+					}
 				}
+			}
+		}
+
+		// stop position
+		{
+			int start_x = 2;
+			int start_y = 1;
+			int start_dir = 3;
+
+			// locally unplausible stop position is an error
+			{
+				std::vector<cv::Point> contour;
+				FECTS::stop_t stop;
+				stop.dir = 1;
+				stop.x = 2;
+				stop.y = 2;
+				TEST_ERROR(FECTS::findContour(contour, image, start_x, start_y, start_dir, true, false, &stop), "stop pixel is not foreground");
+				TEST(contour.size() == 0);
+
+				stop.dir = 2;
+				stop.x = 0;
+				stop.y = 0;
+				TEST_ERROR(FECTS::findContour(contour, image, start_x, start_y, start_dir, true, false, &stop), "stop pixel has bad direction");
+				TEST(contour.size() == 0);
+			}
+
+			// locally plausible incorrect stop position is ignored
+			{
+				std::vector<cv::Point> contour;
+				FECTS::stop_t stop;
+				stop.dir = 0;
+				stop.x = 0;
+				stop.y = 0;
+				TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, start_dir, true, false, &stop));
+				TEST(contour.size() == 4);
+				TEST(have_equal_items(contour, expected_contour));
+				TEST(contour[0] == cv::Point(start_x, start_y));
+				TEST(turns == -4); // inner contour
+				TEST(stop.dir == start_dir);
+				TEST(stop.x == start_x);
+				TEST(stop.y == start_y);
+			}
+
+			// correct stop position stops tracing
+			{
+				std::vector<cv::Point> contour;
+				FECTS::stop_t stop;
+				stop.dir = 1;
+				stop.x = 2;
+				stop.y = 3;
+				TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start_x, start_y, start_dir, true, false, &stop));
+				TEST(contour.size() == 2);
+				TEST(contour[0] == cv::Point(start_x, start_y));
+				TEST(turns == -2);
+				TEST(stop.dir == 1);
+				TEST(stop.x == 2);
+				TEST(stop.y == 3);
 			}
 		}
 	}

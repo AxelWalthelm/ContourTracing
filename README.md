@@ -103,7 +103,7 @@ __Out:__ number of traced contour pixels including suppressed pixels
 **x, y, dir:**
 Usually tracing stops when the start position is reached.
 Sometimes it is useful to stop at another known position on the contour.  
-__In:__ if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!  
+__In:__ if dir is a valid direction 0-3 then (x, y, dir) becomes an additional position to stop tracing  
 __Out:__ (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached.
 
 ## Definition of direction dir 0 to 3 and its offset vector (dx, dy):

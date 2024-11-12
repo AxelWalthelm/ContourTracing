@@ -230,7 +230,7 @@ namespace FECTS
 
 		// Usually tracing stops when the start position is reached.
 		// Sometimes it is useful to stop at another known position on the contour.
-		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!
+		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes an additional position to stop tracing
 		// Out: (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached
 		int dir = -1;
 		int x;
@@ -468,8 +468,8 @@ namespace FECTS
 					if (!is_pixel_valid)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
-
-			} while (x != stop_x || y != stop_y || dir != stop_dir);
+			} while ((x != start_x || y != start_y || dir != start_dir)
+			         && (!is_stop_in || x != stop_x || y != stop_y || dir != stop_dir));
 
 #else
 
@@ -820,7 +820,8 @@ namespace FECTS
 						        is_pixel_valid = x != 0;
 						}
 					}
-				} while (x != stop_x || y != stop_y || dir != stop_dir);
+				} while ((x != start_x || y != start_y || dir != start_dir)
+				         && (!is_stop_in || x != stop_x || y != stop_y || dir != stop_dir));
 			}
 			else
 			{
@@ -1136,7 +1137,8 @@ namespace FECTS
 						        is_pixel_valid = x != 0;
 						}
 					}
-				} while (x != stop_x || y != stop_y || dir != stop_dir);
+				} while ((x != start_x || y != start_y || dir != start_dir)
+				         && (!is_stop_in || x != stop_x || y != stop_y || dir != stop_dir));
 			}
 
 			sum_of_turns = sum_of_turn_overflows * 4 + (clockwise ? dir - start_dir : start_dir - dir);

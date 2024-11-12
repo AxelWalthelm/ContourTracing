@@ -229,7 +229,7 @@ namespace o__NAMESPACE__o
 
 		// Usually tracing stops when the start position is reached.
 		// Sometimes it is useful to stop at another known position on the contour.
-		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes the position to stop tracing - be careful!
+		// In: if dir is a valid direction 0-3 then (x, y, dir) becomes an additional position to stop tracing
 		// Out: (x, y, dir) is the position tracing stopped, e.g. because maximum contour length was reached
 		int dir = -1;
 		int x;
@@ -468,8 +468,7 @@ namespace o__NAMESPACE__o
 					if (!is_pixel_valid)
 						is_pixel_valid = !isLeftBorder(x, y, dir, clockwise, width, height);
 				}
-
-			} while (x != stop_x || y != stop_y || dir != stop_dir);
+			} while (o__TRACE_CONTINUE_CONDITION__o);
 
 #else
 
@@ -513,7 +512,7 @@ namespace o__NAMESPACE__o
 						assert(dir == 3);
 						o__TRACE_STEP_CW_DIR_3__o;
 					}
-				} while (x != stop_x || y != stop_y || dir != stop_dir);
+				} while (o__TRACE_CONTINUE_CONDITION__o);
 			}
 			else
 			{
@@ -536,7 +535,7 @@ namespace o__NAMESPACE__o
 						assert(dir == 3);
 						o__TRACE_STEP_CCW_DIR_3__o;
 					}
-				} while (x != stop_x || y != stop_y || dir != stop_dir);
+				} while (o__TRACE_CONTINUE_CONDITION__o);
 			}
 
 			sum_of_turns = sum_of_turn_overflows * 4 + (clockwise ? dir - start_dir : start_dir - dir);

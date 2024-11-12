@@ -363,6 +363,14 @@ for line_index, line in enumerate(lines):
 			line = code_before + is_forward_border_no_m1_code(int(dir)) + code_after
 			continue
 
+		m = re.match(r'^(.*)o__TRACE_CONTINUE_CONDITION__o(.*)$', line)
+		if m:
+			code_before, code_after = m.groups()
+			indent = re.sub(r'[^\s]', ' ', code_before)
+			line = (code_before + "(x != start_x || y != start_y || dir != start_dir)\n" +
+				indent + "&& (!is_stop_in || x != stop_x || y != stop_y || dir != stop_dir)" + code_after)
+			continue
+
 		lines[line_index] = line
 		break
 
