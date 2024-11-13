@@ -543,14 +543,26 @@ int main()
 			TEST(contour.size() == 0);
 		}
 
-		// bad seed
+		// bad seed direction
 		{
 			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
 
 			// start in the middle
 			std::vector<cv::Point> contour;
-			TEST_ERROR(turns = FECTS::findContour(contour, image, 1, 1, 0, false, false), "bad seed");
+			TEST_ERROR(turns = FECTS::findContour(contour, image, 1, 1, 0, false, false), "bad seed direction");
 			TEST(contour.size() == 0);
+		}
+
+		// bad seed auto-direction - fail silently to allow for testing of more alternatives
+		{
+			cv::Mat image(3, 3, CV_8UC1, cv::Scalar(255));
+
+			// start in the middle
+			std::vector<cv::Point> contour;
+			TEST_ERROR(turns = FECTS::findContour(contour, image, 1, 1, -1, false, false), "bad seed pixel");
+			TEST(contour.size() == 0);
+
+			TEST_ERROR(FECTS::findContour(contour, image, 0, 0, -2, true, false), "seed direction is invalid");
 		}
 
 		// upper-left corner is background

@@ -255,9 +255,13 @@ namespace o__NAMESPACE__o
 	// The start pixel will be the first pixel in contour, unless it has only contour edges at the image border and do_suppress_border is set.
 	//
 	// @param dir Direction to start contour tracing with. 0 is up, 1 is right, 2 is down, 3 is left.
-	// If value is -1, no direction dir is given and a direction is chosen automatically,
-	// which usually gives you what you expect, unless the object to trace is very narrow and the
-	// seed pixel is touching the contour on both sides, in which case tracing will start on the side with the smallest dir.
+	// If value is -1, no direction dir is given and a direction is chosen automatically.
+	// This works well if the seed pixel is part of a single contour only.
+	// If the object to trace is very narrow and the seed pixel is touching the contour on both sides,
+	// the side with the smallest dir is chosen.
+	// Note that a seed pixel can be part of up to four different contours, but no more than one of them can be an outer contour.
+	// So if you expect an outer contour and an outer contour is found, you are good.
+	// Otherwise you need to be more specific.
 	//
 	// @param clockwise Indicates if outer contours are traced clockwise or counterclockwise.
 	// Note that inner contours run in the opposite direction.
@@ -364,7 +368,8 @@ namespace o__NAMESPACE__o
 			moveForward(x, y, dir);
 		}
 
-		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed");
+		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed direction");
+
 		const int start_x = x;
 		const int start_y = y;
 		const int start_dir = dir;
