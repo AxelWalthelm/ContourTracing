@@ -23,7 +23,7 @@ I was not able to find a free C/C++ implementation of a function that traces a s
 
 The basic idea is to trace along edges instead of jumping from pixel to pixel following not always very intuitive rules. We follow along the border lines of the current foreground pixel and the background and decide onto which edge we will go next. So at every corner junction where four pixels join, we have to decide: go left, go forward, or go right. Only three options. And once we have defined that the foreground is 8-connected, the contour line is clearly defined and easy to follow. However we do not output the edges we travel on, we only emit the foreground pixels we encounter on this journey. The tracing is finished when we reach the start edge again. That's all, basically.
 
-The resulting algorithm is quite similar to Theo Pavlidis' algorithm, but it is simpler, does fewer pixel tests, and it can start on any pixel of the contour.
+The resulting algorithm is quite similar to Theo Pavlidis' algorithm, but it is simpler, does fewer pixel-tests, and it can start on any pixel of the contour.
 
 ## Function
 
@@ -115,15 +115,15 @@ __Out:__ (x, y, dir) is the position tracing stopped, e.g. because maximum conto
 		                            x    
 	+---------------------------------->  
 	|               (0, -1)               
-	|                  0                  
+	|                  0  up              
 	|                  ^                  
 	|                  |                  
 	|                  |                  
 	| (-1, 0) 3 <------+------> 1 (1, 0)  
-	|                  |                  
+	|       left       |      right       
 	|                  |                  
 	|                  v                  
-	|                  2                  
+	|                  2  down            
   y |               (0, 1)                
 	v                                     
 ```
@@ -189,7 +189,7 @@ Note that viewing direction "left" and "right" are relative to the image. In all
 **Rule 3 "P3":** else if forward-right pixel is foreground, move to the tested pixel (do not turn)  
 **Rule 4 "PN":** else turn right (do not move)
 
-**Termination:** Tracing is done when we return to the start pixel. Special handling of single-pixel contour objects is needed, so we also terminate if we rotated 3 times on the start pixel. Some implementations may use [alternative termination tests](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#an).
+**Termination:** Tracing ends when we return to the start pixel. Special handling of single-pixel contour objects is needed, so tracing also ends if it turned 3 times in a row on the start pixel. Some implementations may use [alternative termination tests](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#an).
 
 ### FECTS' Rules
 
@@ -201,7 +201,7 @@ Note that viewing direction "left" and "right" are relative to the image. In all
 **Rule 2 "EF":** else if forward pixel is foreground, move to the tested pixel (do not turn)  
 **Rule 3 "ER":** else turn right (do not move)
 
-**Termination:** Tracing is done when we reach the edge we started on, i.e. we are on the same pixel in the same viewing direction.
+**Termination:** Tracing ends when we reach the edge we started on, i.e. we are on the same pixel in the same viewing direction.
 
 ### Comparison
 
@@ -215,7 +215,7 @@ Rules PN and ER are basically the same.
 
 **Rule P3 is the oddball one.** FECTS would do ER instead and turn right &mdash; which makes P3 become the new forward-left pixel. For rule P3 to apply, the original forward-right pixel P3 has to be foreground, so for FECTS the new forward-left pixel is foreground and rule EL applies next. EL turns left and moves to P3. FECTS ends up in the same state as Pavlidis' rule P3.
 
-Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a single step. It is redundant, and what is more it hinders the use of a clean and simple edge-based termination criteria, because it follows two edges in a single step and therefore may skip the start edge.
+Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a single step. It is redundant, and what is more it prevents the use of a clean and simple edge-based termination criteria, because it follows two edges in a single step and therefore may skip the start edge.
 
 Compared to P3, ER+EL does one extra step, but it does the same number of pixel-tests.
 
@@ -227,7 +227,7 @@ Compared to P3, ER+EL does one extra step, but it does the same number of pixel-
 |       PN | **3** ❌     |       ER | **2** ✔️     |
 |      Sum | **9**         |     Sum | **8**         |
 
-From this table it is obvious that FECTS does fewer pixel tests.
+From this table it is obvious that FECTS does fewer pixel-tests, because it can turn right with just 2 pixel-tests.
 
 The saved pixel-tests are redundant.
 For example look at ER+EF compared to PN+P2. PN+P2 does one extra pixel-test, because in this case the first PN tests P3 as background, turns right &mdash; which makes pixel P3 become P1 &mdash; and then the second PN tests P1 a second time.
@@ -256,9 +256,9 @@ Then we just have to compare all possible pairs of FECTS' rules with their Pavli
 
 Based on this table it seems that rule P3 does not happen very often. Only in one of the nine double-step cases it saves one single step.
 
-So a rough estimate would be: **FECTS saves 14% of the pixel tests and does only 6% more steps**.
+So a rough estimate would be: **FECTS saves 14% of the pixel-tests and does only 6% more steps**.
 
-Each extra step of FECTS ends with an extra termination check. FECTS may also have to do up to three additional steps at the end of a contour until the start edge is reached. But for this small price **FECTS is simpler, usually faster, and it can consistently terminate**.
+Each extra step of FECTS ends with an extra termination check. FECTS may also have to do up to three additional steps at the end of a contour until the start edge is reached. But for this small price **FECTS is simpler, usually faster, and it terminates consistently**.
 
 ### Emitting the Contour
 
