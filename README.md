@@ -213,9 +213,9 @@ Rules P2 and EF are basically the same.
 
 Rules PN and ER are basically the same.  
 
-Rule P3 is the oddball one. FECTS would do ER instead and turn right &mdash; which makes P3 become the new forward-left pixel. For rule P3 to apply, the original forward-right pixel P3 has to be foreground, so for FECTS the new forward-left pixel is foreground and rule EL applies next. EL turns left and moves to P3. FECTS ends up in the same state as Pavlidis' rule P3.
+**Rule P3 is the oddball one.** FECTS would do ER instead and turn right &mdash; which makes P3 become the new forward-left pixel. For rule P3 to apply, the original forward-right pixel P3 has to be foreground, so for FECTS the new forward-left pixel is foreground and rule EL applies next. EL turns left and moves to P3. FECTS ends up in the same state as Pavlidis' rule P3.
 
-Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a single step. It is redundant, and what is more it hinders the use of a clean and simple termination criteria, because it follows two edges in a single step and therefore may skip the start edge.
+Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a single step. It is redundant, and what is more it hinders the use of a clean and simple edge-based termination criteria, because it follows two edges in a single step and therefore may skip the start edge.
 
 Compared to P3, ER+EL does one extra step, but it does the same number of pixel-tests.
 
@@ -264,11 +264,11 @@ Each extra step of FECTS ends with an extra termination check. FECTS may also ha
 
 In both algorithms we know a pixel is part of the traced contour when we reach it. This information is contained in each rule: P1, P2, P3, EL, and EF go to a different pixel, but PN and ER do not.
 
-In the given FECTS implementation a pixel is emitted into the traced contour when we leave the pixel. This allows for efficient suppression of border-only pixels. Pixel-based analysis can only suppress pixels that are *at* the border, while edge-based analysis allows to suppress pixels where the contour only follows the image border, while keeping those pixels where the contour reaches or leaves the image border. If you are not interested in this feature, the implementation may be slightly simplified by emitting pixels when reaching the pixel, but then the start pixel may be at the end of the contour.
+In the given FECTS implementation a pixel is emitted into the traced contour when we leave the pixel. This allows for efficient suppression of border-only pixels. Pixel-based analysis can only suppress pixels that are *at* the border, while **edge-based analysis allows to suppress pixels where the contour only follows the image border, while keeping those pixels where the contour reaches or leaves the image border**. If you are not interested in this feature, the implementation may be minimally simplified by emitting pixels when they are reached. (But consider if you want the start pixel to be emitted at the end.)
 
 ### Choosing the Start State
 
-According to [A. Ghuneim](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#restrict) Pavlidis' algorithm needs a start pixel, that is foreground and has a background pixel to its left. In the edge based view that means we have to start on an upward edge. Adjusting the algorithm for the 3 other start directions is probably easy, but there are still start pixels that will terminate early before the full contour is traced. 
+According to [A. Ghuneim](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#restrict) Pavlidis' algorithm needs a start pixel that is foreground and has a background pixel to its left. In the edge-based view that means we have to start on an upward edge. Adjusting the algorithm for the 3 other start directions is probably easy, but there are still start pixels that will terminate early before the full contour is traced. 
 
 According to the GitHub project [geocontour](https://github.com/benkrichman/geocontour) Pavlidis' algorithm also has problems "capturing inside corners".
 
