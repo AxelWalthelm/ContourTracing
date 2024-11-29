@@ -166,6 +166,7 @@ else (rule 3)
 In case of counterclockwise tracing the rules are the same except that left and right are exchanged.
 ```
 
+
 ## Comparison with Theo Pavlidis' Algorithm
 
 The book
@@ -174,11 +175,108 @@ from 1982 is not online, but there is a nice description of
 [Theo Pavlidis' algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theo.html)
 by A. Ghuneim.
 
-TODO
+For a comparison let's first summarize both algorithms in a comparable form. We follow A. Ghuneim and &mdash; without loss of generality &mdash; discuss only the case of clockwise tracing.
 
-According to the GitHub project [geocontour](https://github.com/benkrichman/geocontour) Pavlidis' algorithm has problems "capturing inside corners".
+### Theo Pavlidis' Rules
+**State** of tracing is the center of the current pixel (x,y) and the current 90° viewing direction up, right, down, or left.
 
-## Performance
+Note that viewing direction "left" and "right" are relative to the image. In all other cases, "left" and "right" are relative to the current viewing direction. Just as "forward" and "backward" are always relative to the current viewing direction. 
+
+**Tested Pixels** are forward-left (P1), forward (P2), and forward-right (P3).
+
+**Rule 1 "P1":** if forward-left pixel is foreground, move to the tested pixel and turn left  
+**Rule 2 "P2":** else if forward pixel is foreground, move to the tested pixel (do not turn)  
+**Rule 3 "P3":** else if forward-right pixel is foreground, move to the tested pixel (do not turn)  
+**Rule 4 "PN":** else turn right (do not move)
+
+**Termination:** Tracing is done when we return to the start pixel. Special handling of single-pixel contour objects is needed, so we also terminate if we rotated 3 times on the start pixel. Some implementations may use [alternative termination tests](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#an).
+
+### FECTS Rules
+
+**State** of tracing is one of the four edges of the current pixel (x, y) in a given direction. This is also specified as a 90° viewing direction. We are located on the left side edge of the pixel.
+
+**Tested Pixels** are forward-left and forward.
+
+**Rule 1 "EL":** if forward-left pixel is foreground, move to the tested pixel and turn left  
+**Rule 2 "EF":** else if forward pixel is foreground, move to the tested pixel (do not turn)  
+**Rule 3 "ER":** else turn right (do not move)
+
+**Termination:** Tracing is done when we reach the edge we started on, i.e. we are on the same pixel in the same viewing direction.
+
+### Comparison
+
+For this comparison the rules were named distinctly using the pixel or edge the rule moves to. **P1** to **P3** are the rule that move to tested **P**ixel P**1**, P**2**, or P**3** respectively. **PN** is the rule that does **N**ot move. **EL** is the rule that moves to the **L**eft **E**dge, **EF** moves to the **F**orward edge, **ER** to the **R**ight edge.
+
+Rules P1 and EL are basically the same.
+
+Rules P2 and EF are basically the same.
+
+Rules PN and ER are basically the same.  
+
+Rule P3 is the oddball one. FECTS would do ER instead and turn right &mdash; which makes P3 become the new forward-left pixel. For rule P3 to apply, the original forward-right pixel P3 has to be foreground, so for FECTS the new forward-left pixel is foreground and rule EL applies next. EL turns left and moves to P3. FECTS ends up in the same state as Pavlidis' P3.
+
+Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a single step. It is redundant, and what is more it hinders the use of a clean and simple termination criteria, because it follows two edges in a single step and therefore may skip the start edge.
+
+Compared to P3, ER+EL does one extra step, but it does the same number of pixel-tests.
+
+| Pavlidis | # Pixel-Tests |   FECTS | # Pixel-Tests |
+|---------:|:--------------|--------:|:--------------|
+|       P1 |   1           |      EL |   1           |
+|       P2 |   2           |      EF |   2           |
+|       P3 |   3           |💡 ER+EL |   3 = 2+1 ✔️  |
+|       PN | **3** ❌     |       ER | **2** ✔️     |
+|      Sum | **9**         |     Sum | **8**         |
+
+From this table it is obvious that FECTS does fewer pixel tests.
+
+The saved pixel-tests are redundant.
+For example look at ER+EF compared to PN+P2. PN+P2 does one extra pixel-test, because in this case the first PN tests P3 as background, turns right &mdash; which makes P3 become P1 &mdash; and then the second PN tests P1 a second time.
+
+Also note that for the same reason PN+P1 will never happen, because if PN applies, pixel P3 is background, P3 becomes P1 and the test for rule P1 is done futilely.
+
+### Theoretical Performance Difference
+
+How many pixel-tests are saved and how many extra steps are needed depends on the frequency of these cases. Since Pavlidis rules obviously are not independent, let's rather assume FECTS rules are independent and have the same frequency. While this assumption is not true for some artificial shapes like an axis-aligned rectangle, for noisy real world shapes it is plausible to assume that we go forward in about one third of the cases. In a closed contour, left and right turns pretty much balance out, so left and right get half of the remaining two thirds probability each.
+
+Then we just have to compare all possible pairs of FECTS rules with their Pavlidis counterpart:
+
+|    FECTS | # Pixel-Tests | Pavlidis | # Pixel-Tests |
+|---------:|:--------------|---------:|:--------------|
+|    EL+EL | 2 = 1+1       |    P1+P1 | 2 = 1+1       |
+|    EL+EF | 3 = 1+2       |    P1+P2 | 3 = 1+2       |
+|    EL+ER | 3 = 1+2       |    P1+PN | 4 = 1+3 ❌   |
+|    EF+EL | 3 = 2+1       |    P2+P1 | 3 = 2+1       |
+|    EF+EF | 4 = 2+2       |    P2+P2 | 4 = 2+2       |
+|    EF+ER | 4 = 2+2       |    P2+PN | 5 = 2+3 ❌   |
+|    ER+EL | 3 = 2+1       |       P3 | 3 <span style="color:#00FF00">**(✔️)**</span>|
+|    ER+EF | 4 = 2+2       |    PN+P2 | 5 = 3+2 ❌   |
+|    ER+ER | 4 = 2+2       |    PN+PN | 6 = 3+3 ❌   |
+|      Sum | **30**        |      Sum | **35**        |
+| 18 Steps |               | 17 Steps |               |
+
+Based on this table it seems that rule P3 does not happen very often. Only in one of the nine double-step cases it saves one single step.
+
+So a rough estimate would be: **FECTS saves 14% of the pixel tests and does only 6% more steps**.
+
+Each extra step of FECTS ends with an extra termination check. FECTS may also have to do up to three additional steps at the end of a contour until the start edge is reached. But for this small price **FECTS is simpler, usually faster, and it can consistently terminate**.
+
+### Emitting the Contour
+
+In both algorithms we know a pixel is part of the traced contour when we reach it. This information is contained in each rule: P1, P2, P3, EL, and EF go to a different pixel, but PN and ER do not.
+
+In the given FECTS implementation a pixel is emitted into the traced contour when we leave the pixel. This allows for efficient suppression of border-only pixels. Pixel-based analysis can only suppress pixels that are *at* the border, while edge-based analysis allows to suppress pixels where the contour only follows the image border, while keeping those pixels where the contour reaches or leaves the image border. If you are not interested in this feature, the implementation may be slightly simplified by emitting pixels when reaching the pixel, but then the start pixel may be at the end of the contour.
+
+### Choosing the Start State
+
+According to [A. Ghuneim](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#restrict) Pavlidis' algorithm needs a start pixel, that has a background pixel to its left. In the edge based view that means we have to start on an upward edge. Adjusting the algorithm for the 3 other start directions is probably easy, but there are still start pixels that will terminate early before the full contour is traced. 
+
+According to the GitHub project [geocontour](https://github.com/benkrichman/geocontour) Pavlidis' algorithm also has problems "capturing inside corners".
+
+To be fair, [Pavlidis' algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#alg) seems to have been designed to only trace the most outer contour and start on the first pixel of the contour found when scanning the image in memory order. This avoids many &mdash; if not all &mdash; of the problems of choosing a suitable start point and direction.
+
+However **FECTS can start on any pixel edge of the contour**, no matter if it is an outer contour or an inner contour.
+
+## Experimental Performance
 
 The inner loop of contour tracing is optionally unrolled and optimized for speed.
 To generate this optimized code a Python script is used. Use macro FEPCT_GENERATOR_OPTIMIZED to control use of the optimized code.
@@ -303,7 +401,7 @@ Start point will always be first point in the resulting contour, but you can que
 Example:
 ```
 ContourChainApproxSimple<std::vector<cv::Point>> contour;
-FECT::findContour(contour, image, start.x, start.y, -1);
+FECTS::findContour(contour, image, start.x, start.y, -1);
 std::vector<cv::Point>& contour_points = contour.get();
 if (contour.do_suppress_start())
     contour_points.erase(contour_points.begin());
