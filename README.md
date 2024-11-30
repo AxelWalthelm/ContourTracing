@@ -224,13 +224,13 @@ Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a
 
 Compared to P3, ER+EL does one extra step, but it does the same number of pixel-tests.
 
-| Pavlidis | # Pixel-Tests |   FECTS | # Pixel-Tests |
-|---------:|:--------------|--------:|:--------------|
-|       P1 |   1           |      EL |   1           |
-|       P2 |   2           |      EF |   2           |
-|       P3 |   3           |💡 ER+EL |   3 = 2+1 ✔️  |
-|       PN | **3** ❌     |       ER | **2** ✔️     |
-|      Sum | **9**         |     Sum | **8**         |
+| Pavlidis | Pixel-Tests   |         FECTS | Pixel-Tests     |
+|---------:|:--------------|--------------:|:----------------|
+|       P1 |   1           |            EL | 1               |
+|       P2 |   2           |            EF | 2               |
+|       P3 |   3           | 💡&nbsp;ER+EL | 3 = 2+1&nbsp;✔️ |
+|       PN | **3**&nbsp;❌ |           ER | **2**&nbsp;✔️   |
+|      Sum | **9**         |           Sum | **8**           |
 
 From this table it is obvious that FECTS does fewer pixel-tests, because it can turn right with just 2 pixel-tests.
 
@@ -246,25 +246,25 @@ Since Pavlidis' rules obviously are not independent, let's rather assume that FE
 While this assumption is not true for some artificial shapes like an axis-aligned rectangle, for noisy real world shapes it is plausible to assume that we go forward in about one third of the steps.
 In a closed contour, left and right turns pretty much balance out, so the two cases of going left or right gets half of the remaining two thirds probability.
 
-For a statistical analysis we now try to generate at all possible infinite sequences of EL, EF, and ER from a small set of unambiguous finite sequences.
+For a statistical analysis we now try to generate all possible infinite sequences of EL, EF, and ER from a small set of unambiguous finite sequences.
 These finite sequences are concatenated randomly according to their probability.
 Longer sequences have lower probability.
 Every sequence that ends with ER may possibly continue with EL and because ER+EL is P3 it is ambiguous and needs to be split into three longer sequences.
 If the sequence does not end with ER, it has an unambiguous equivalent sequence in P1, P2, P3, and PN, and we can stop making it longer.
  We can also stop after three right turns, because this can happen only for a single-pixel contour object, i.e. ER+ER+ER can only happen once in a sequence, and only at the start.
  This violates the assumption of rules ER, EF, and ER to be independent.
- Therefore the single-pixel case is excluded from this statistical analysis by adjusting the probability of ER+ER+ER to zero.
+ The single-pixel case is excluded from this statistical analysis by adjusting the probability of ER+ER+ER to zero.
 
-| FECTS Sequence | Steps | Pixel-Tests | Pavlidis Sequence | Steps | Pixel-Tests  | Probability Weight |
-|---------:|------:|:------------|----------:|------:|:-------------|:------------------:|
-|       EL |   1   | 1           |        P1 |     1 | 1            | $\frac{1}{3}$ |
-|       EF |   1   | 2           |        P2 |     1 | 2            | $\frac{1}{3}$ |
-|    ER+EL |❌ 2   | 3 = 2+1     |    **P3** | ✔️ 1 | 3             | $\frac{1}{3}\cdot\frac{1}{3}$ |
-|    ER+EF |   2   | 4 = 2+2 ✔️  |     PN+P2 |     2 | 5 = 3+2 ❌   | $\frac{1}{3}\cdot\frac{1}{3}$ |
-| ER+ER+EL |❌ 3   | 5 = 2+2+1 ✔️| PN+**P3** | ✔️ 2 | 6 = 3+3 ❌   | $\frac{1}{3}\cdot\frac{1}{3}\cdot\frac{1}{2}$ |
-| ER+ER+EF |   3   | 6 = 2+2+2 ✔️|  PN+PN+P2 |     3 | 8 = 3+3+2 ❌ | $\frac{1}{3}\cdot\frac{1}{3}\cdot\frac{1}{2}$ |
-| ER+ER+ER |   3   | 6 = 2+2+2 ✔️|  PN+PN+PN |     3 | 9 = 3+3+3 ❌ | $\frac{1}{3}\cdot\frac{1}{3}\cdot0$ |
-| **Weighted Sum** | 1.44 | 2.39 | **Weighted Sum** | 1.33 | 2.67 | $\sum=1$ |
+|   FECTS Sequence |     Steps | Pixel-Tests       | Pavlidis Sequence |     Steps | Pixel-Tests        | Probability Weight |
+|-----------------:|----------:|:------------------|------------------:|----------:|:-------------------|:-------------------|
+|               EL |         1 | 1                 |                P1 |         1 | 1                  | ⅓     |
+|               EF |         1 | 2                 |                P2 |         1 | 2                  | ⅓     |
+|            ER+EL | ❌&nbsp;2 | 3 = 2+1          |            **P3** | ✔️&nbsp;1 | 3                  | ⅓·⅓   |
+|            ER+EF |         2 | 4 = 2+2&nbsp;✔️  |             PN+P2 |          2 | 5 = 3+2&nbsp;❌   | ⅓·⅓   |
+|         ER+ER+EL | ❌&nbsp;3 | 5 = 2+2+1&nbsp;✔️|         PN+**P3** | ✔️&nbsp;2 | 6 = 3+3&nbsp;❌   | ⅓·⅓·½ |
+|         ER+ER+EF |         3 | 6 = 2+2+2&nbsp;✔️|          PN+PN+P2 |          3 | 8 = 3+3+2&nbsp;❌ | ⅓·⅓·½ |
+|         ER+ER+ER |         3 | 6 = 2+2+2&nbsp;✔️|          PN+PN+PN |          3 | 9 = 3+3+3&nbsp;❌ | ⅓·⅓·0 |
+| **Weighted Sum** |      1.44 | 2.39              |  **Weighted Sum** | 1.33      | 2.67               | ∑=1   |
 
 Based on this table it becomes obvious that rule P3 does not happen very often.
 It appears only in two sequences.
@@ -274,7 +274,7 @@ It can appear on its own with a probability of 1/9th and it can appear in PN+P3 
 As a plausibility check, let's assume for a moment that pixel P1, P2, and P3 are randomly set with a 50% probability.
 This is a different assumption to the one above, but intuitively it is similar, so the result should be similar.
 Rule P3 is only activated in case P1 and P2 are background and P3 is foreground.
-The probability for this is now 0.5³ or 12.5%. ✔️
+The probability for this is now 0.5³ or 12.5%.&nbsp;✔️
 
 | Weighted Average |    FECTS | Pavlidis |     Ratio |
 |-----------------:|---------:|---------:|----------:|
@@ -282,7 +282,7 @@ The probability for this is now 0.5³ or 12.5%. ✔️
 |            Steps |     1.44 |     1.33 | **1.083** |
 | Pixel-Tests/Step | **1.65** | **2.00** | **0.827** |
 
-So our estimate is: **FECTS performs 17% less pixel-tests, but does only 8% more steps**.
+So our estimate is: **FECTS performs 17% fewer pixel-tests, but does only 8% more steps**.
 
 Each extra step of FECTS causes an extra termination check.
 FECTS may also have to do up to three additional steps to close the contour edge-wise.
@@ -299,7 +299,8 @@ Pavlidis' algorithm emits pixels when the pixel is reached.
 
 In the given FECTS implementation a pixel is emitted into the traced contour when we leave the pixel.
 This allows for efficient suppression of border-only pixels.
-Pixel-based analysis can only suppress pixels that are *at* the border, but **edge-based analysis allows to suppress pixels where the contour follows the image border, while keeping pixels where the contour reaches or leaves the image border**.
+Pixel-based analysis can only suppress pixels that are *at* the border, but
+**edge-based analysis can suppress pixels where the contour follows the image border, while keeping pixels where the contour reaches or leaves the image border**.
 If you are not interested in this feature, the implementation may be minimally simplified by emitting pixels when they are reached.
 (But think about: do you want the start pixel to be at the begin, the end, or both?)
 
@@ -316,7 +317,7 @@ According to the GitHub project
 Pavlidis' algorithm also has problems "capturing inside corners".
 
 [Pavlidis' algorithm](https://www.imageprocessingplace.com/downloads_V3/root_downloads/tutorials/contour_tracing_Abeer_George_Ghuneim/theomain.html#alg)
-seems to have been designed to only trace the outermost outer contour and start on the first pixel of the contour that is found when scanning the image in memory order &mdash;
+seems to have been designed to only trace the outermost outer contour and start on the first foreground pixel that is found when scanning the image in memory order &mdash;
 so technically speaking this point is the only valid start point.
 
 **FECTS can start on any pixel edge of the contour**, no matter if it is an outer contour or an inner contour.
@@ -324,7 +325,7 @@ so technically speaking this point is the only valid start point.
 ## Experimental Performance
 
 The inner loop of contour tracing is optionally unrolled and optimized for speed.
-To generate this optimized code a Python script is used. Use macro FEPCT_GENERATOR_OPTIMIZED to control use of the optimized code.
+To generate this optimized code a Python script is used. Use macro FECTS_GENERATOR_OPTIMIZED to control use of the optimized code.
 
 To minimize border checking operations in the optimized code, a border test is done as a first step called rule 0:
 
@@ -377,7 +378,7 @@ Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 withou
     6 (403): 93557000 ns, 1157859 pix, 80 ns/pix
     7 (1096): 5608300 ns, 84840 pix, 66 ns/pix
     time OpenCV:  3107149100 ns, 9594334 pix, 323 ns/pix
-    time FEPCT:   1983026200 ns, 9594334 pix, 206 ns/pix
+    time FECTS:   1983026200 ns, 9594334 pix, 206 ns/pix
     time ratio: 0.638
 
 
