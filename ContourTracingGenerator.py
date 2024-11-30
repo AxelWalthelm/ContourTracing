@@ -18,7 +18,7 @@ Consider to edit {} and {} instead.
 """.strip('\n').format(os.path.basename(__file__), os.path.basename(template_file))
 
 introduction = """
- Fast Edge-Oriented Contour Tracing from Seed-Point (FECTS)
+ Fast Edge-Based Contour Tracing from Seed-Point (FECTS)
 ============================================================
 
 See README.md at https://github.com/AxelWalthelm/ContourTracing/ for more information.

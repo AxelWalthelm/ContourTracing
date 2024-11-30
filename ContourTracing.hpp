@@ -21,7 +21,7 @@ Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.
 #endif
 
 /*
- Fast Edge-Oriented Contour Tracing from Seed-Point (FECTS)
+ Fast Edge-Based Contour Tracing from Seed-Point (FECTS)
 ============================================================
 
 See README.md at https://github.com/AxelWalthelm/ContourTracing/ for more information.
