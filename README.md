@@ -205,7 +205,7 @@ Note that viewing direction "left" and "right" are relative to the image. In all
 
 ### Comparison
 
-For this comparison the rules were named distinctly using the pixel or edge the rule moves to. **P1** to **P3** are the rule that move to tested **P**ixel P**1**, P**2**, or P**3** respectively. **PN** is the rule that does **N**ot move. **EL** is the rule that moves to the **L**eft **E**dge, **EF** moves to the **F**orward edge, **ER** to the **R**ight edge.
+For this comparison the rules were named distinctly using the pixel or edge the rule moves to. **P1** to **P3** are the rules that move to tested **P**ixel P**1**, P**2**, and P**3** respectively. **PN** is the rule that does **N**ot move. **EL** is the rule that moves to the **L**eft **E**dge, **EF** moves to the **F**orward edge, **ER** to the **R**ight edge.
 
 Rules P1 and EL are basically the same.
 
@@ -230,15 +230,15 @@ Compared to P3, ER+EL does one extra step, but it does the same number of pixel-
 From this table it is obvious that FECTS does fewer pixel-tests, because it can turn right with just 2 pixel-tests.
 
 The saved pixel-tests are redundant.
-For example look at ER+EF compared to PN+P2. PN+P2 does one extra pixel-test, because in this case the first PN tests P3 as background, turns right &mdash; which makes pixel P3 become P1 &mdash; and then the second PN tests P1 a second time.
+For example look at ER+EF compared to PN+P2. PN+P2 does one extra pixel-test, because in this case the PN tests P3 as background, turns right &mdash; which makes pixel P3 become P1 &mdash; and then rule P2 tests pixel P1 a second time.
 
-Also note that for the same reason PN+P1 will never happen, because if PN applies, pixel P3 is background, P3 becomes P1 and the test for rule P1 is done futilely.
+For the same reason PN+P1 will never happen, because if PN applies, pixel P3 is background, P3 becomes P1, and the test for rule P1 is done unnecessarily.
 
 ### Theoretical Performance Gain
 
-How many pixel-tests are saved and how many extra steps are needed depends on the frequency of these cases. Since Pavlidis' rules obviously are not independent, let's rather assume that FECTS' rules are independent and have the same frequency. While this assumption is not true for some artificial shapes like an axis-aligned rectangle, for noisy real world shapes it is plausible to assume that we go forward in about one third of the cases. In a closed contour, left and right turns pretty much balance out, so left and right get half of the remaining two thirds probability each.
+How many pixel-tests are saved and how many extra steps are needed depends on the frequency of these cases. Since Pavlidis' rules obviously are not independent, let's rather assume that FECTS' rules are independent and have the same frequency. While this assumption is not true for some artificial shapes like an axis-aligned rectangle, for noisy real world shapes it is plausible to assume that we go forward in about one third of the steps. In a closed contour, left and right turns pretty much balance out, so going left or right gets half of the remaining two thirds probability.
 
-Then we just have to compare all possible pairs of FECTS' rules with their Pavlidis' counterpart:
+Now we just have to compare all possible pairs of FECTS' rules with their Pavlidis' counterpart:
 
 |    FECTS | # Pixel-Tests | Pavlidis | # Pixel-Tests |
 |---------:|:--------------|---------:|:--------------|
@@ -248,15 +248,15 @@ Then we just have to compare all possible pairs of FECTS' rules with their Pavli
 |    EF+EL | 3 = 2+1       |    P2+P1 | 3 = 2+1       |
 |    EF+EF | 4 = 2+2       |    P2+P2 | 4 = 2+2       |
 |    EF+ER | 4 = 2+2       |    P2+PN | 5 = 2+3 ❌   |
-|    ER+EL | 3 = 2+1       |       P3 | 3 <span style="color:#00FF00">**(✔️)**</span>|
+|    ER+EL | 3 = 2+1       |    ✔️ P3 | 3            |
 |    ER+EF | 4 = 2+2       |    PN+P2 | 5 = 3+2 ❌   |
 |    ER+ER | 4 = 2+2       |    PN+PN | 6 = 3+3 ❌❌ |
 |      Sum | **30**        |      Sum | **35**        |
 | **18** Steps |           | **17** Steps |           |
 
-Based on this table it seems that rule P3 does not happen very often. Only in one of the nine double-step cases it saves one single step.
+Based on this table it seems that rule P3 does not happen very often. Only in one of the nine double-step cases rule P3 saves one single step. But in four out of nine double-steps P3 causes more pixel-tests.
 
-So a rough estimate would be: **FECTS saves 14% of the pixel-tests and does only 6% more steps**.
+So a rough estimate would be: **FECTS performs 14% less pixel-tests, but does only 6% more steps**.
 
 Each extra step of FECTS ends with an extra termination check. FECTS may also have to do up to three additional steps at the end of a contour until the start edge is reached. But for this small price **FECTS is simpler, usually faster, and it terminates consistently**.
 
