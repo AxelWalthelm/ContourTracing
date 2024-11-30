@@ -224,13 +224,13 @@ Viewed from the edge-based point of view, rule P3 is a shortcut to do ER+EL in a
 
 Compared to P3, ER+EL does one extra step, but it does the same number of pixel-tests.
 
-| Pavlidis | Pixel-Tests   |         FECTS | Pixel-Tests     |
-|---------:|:--------------|--------------:|:----------------|
-|       P1 |   1           |            EL | 1               |
-|       P2 |   2           |            EF | 2               |
-|       P3 |   3           | 💡&nbsp;ER+EL | 3 = 2+1&nbsp;✔️ |
-|       PN | **3**&nbsp;❌ |           ER | **2**&nbsp;✔️   |
-|      Sum | **9**         |           Sum | **8**           |
+| Pavlidis | Pixel-Tests   |         FECTS | Pixel-Tests               |
+|---------:|:--------------|--------------:|:--------------------------|
+|       P1 |   1           |            EL | 1                         |
+|       P2 |   2           |            EF | 2                         |
+|       P3 |   3           | 💡&nbsp;ER+EL | 3&nbsp;=&nbsp;2+1&nbsp;✔️ |
+|       PN | **3**&nbsp;❌ |           ER | **2**&nbsp;✔️             |
+|      Sum | **9**         |           Sum | **8**                     |
 
 From this table it is obvious that FECTS does fewer pixel-tests, because it can turn right with just 2 pixel-tests.
 
@@ -255,16 +255,16 @@ If the sequence does not end with ER, it has an unambiguous equivalent sequence 
  This violates the assumption of rules ER, EF, and ER to be independent.
  The single-pixel case is excluded from this statistical analysis by adjusting the probability of ER+ER+ER to zero.
 
-|   FECTS Sequence |     Steps | Pixel-Tests       | Pavlidis Sequence |     Steps | Pixel-Tests        | Probability Weight |
-|-----------------:|----------:|:------------------|------------------:|----------:|:-------------------|:-------------------|
-|               EL |         1 | 1                 |                P1 |         1 | 1                  | ⅓     |
-|               EF |         1 | 2                 |                P2 |         1 | 2                  | ⅓     |
-|            ER+EL | ❌&nbsp;2 | 3 = 2+1          |            **P3** | ✔️&nbsp;1 | 3                  | ⅓·⅓   |
-|            ER+EF |         2 | 4 = 2+2&nbsp;✔️  |             PN+P2 |          2 | 5 = 3+2&nbsp;❌   | ⅓·⅓   |
-|         ER+ER+EL | ❌&nbsp;3 | 5 = 2+2+1&nbsp;✔️|         PN+**P3** | ✔️&nbsp;2 | 6 = 3+3&nbsp;❌   | ⅓·⅓·½ |
-|         ER+ER+EF |         3 | 6 = 2+2+2&nbsp;✔️|          PN+PN+P2 |          3 | 8 = 3+3+2&nbsp;❌ | ⅓·⅓·½ |
-|         ER+ER+ER |         3 | 6 = 2+2+2&nbsp;✔️|          PN+PN+PN |          3 | 9 = 3+3+3&nbsp;❌ | ⅓·⅓·0 |
-| **Weighted Sum** |      1.44 | 2.39              |  **Weighted Sum** | 1.33      | 2.67               | ∑=1   |
+|   FECTS Sequence |     Steps | Pixel-Tests                 | Pavlidis Sequence |     Steps | Pixel-Tests                  | Probability Weight |
+|-----------------:|----------:|:----------------------------|------------------:|----------:|:-----------------------------|:-------------------|
+|               EL |         1 | 1                           |                P1 |         1 | 1                            | ⅓                  |
+|               EF |         1 | 2                           |                P2 |         1 | 2                            | ⅓                  |
+|            ER+EL | ❌&nbsp;2 | 3&nbsp;=&nbsp;2+1          |            **P3** | ✔️&nbsp;1 | 3                            | ⅓·⅓                |
+|            ER+EF |         2 | 4&nbsp;=&nbsp;2+2&nbsp;✔️  |             PN+P2 |          2 | 5&nbsp;=&nbsp;3+2&nbsp;❌   | ⅓·⅓                |
+|         ER+ER+EL | ❌&nbsp;3 | 5&nbsp;=&nbsp;2+2+1&nbsp;✔️|         PN+**P3** | ✔️&nbsp;2 | 6&nbsp;=&nbsp;3+3&nbsp;❌   | ⅓·⅓·½              |
+|         ER+ER+EF |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️|          PN+PN+P2 |          3 | 8&nbsp;=&nbsp;3+3+2&nbsp;❌ | ⅓·⅓·½              |
+|         ER+ER+ER |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️|          PN+PN+PN |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌ | ⅓·⅓·0              |
+| **Weighted Sum** |      1.44 | 2.39                        |  **Weighted Sum** | 1.33      | 2.67                         | ∑=1                |
 
 Based on this table it becomes obvious that rule P3 does not happen very often.
 It appears only in two sequences.
