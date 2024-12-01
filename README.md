@@ -112,20 +112,20 @@ __Out:__ (x, y, dir) is the position tracing stopped, e.g. because maximum conto
 
 ## Definition of direction dir 0 to 3 and its offset vector (dx, dy):
 ```
-		                            x    
-	+---------------------------------->  
-	|               (0, -1)               
-	|                  0  up              
-	|                  ^                  
-	|                  |                  
-	|                  |                  
-	| (-1, 0) 3 <------+------> 1 (1, 0)  
-	|       left       |      right       
-	|                  |                  
-	|                  v                  
-	|                  2  down            
+                                    x    
+    +---------------------------------->  
+    |               (0, -1)               
+    |                  0  up              
+    |                  ^                  
+    |                  |                  
+    |                  |                  
+    | (-1, 0) 3 <------+------> 1 (1, 0)  
+    |       left       |      right       
+    |                  |                  
+    |                  v                  
+    |                  2  down            
   y |               (0, 1)                
-	v                                     
+    v                                     
 ```
 
 ## Tracing Rules
@@ -323,10 +323,10 @@ If the sequence does not end with ER, it has an unambiguous equivalent sequence 
 |                ER+EF |         2 | 4&nbsp;=&nbsp;2+2&nbsp;✔️    | |               PN+P2 |          2 | 5&nbsp;=&nbsp;3+2&nbsp;❌      | ⅓·⅓     |
 |             ER+ER+EL | ❌&nbsp;3 | 5&nbsp;=&nbsp;2+2+1&nbsp;✔️ | |            PN+**P3** | ✔️&nbsp;2 | 6&nbsp;=&nbsp;3+3&nbsp;❌      | ⅓·⅓·⅓   |
 |             ER+ER+EF |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️  | |            PN+PN+P2 |          3 | 8&nbsp;=&nbsp;3+3+2&nbsp;❌    | ⅓·⅓·⅓   |
-|          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |        PN+PN+**P3** |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌ | ⅓·⅓·⅓·½ |
+|          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |        PN+PN+**P3** |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌    | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+EF |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+P2 |          4 | 11&nbsp;=&nbsp;3+3+3+2&nbsp;❌ | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+ER |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+PN |          4 | 12&nbsp;=&nbsp;3+3+3+3&nbsp;❌ | ⅓·⅓·⅓·0 |
-| **Weighted Average** |     1.481 | 2.463                        | | **Weighted Average** |      1.33 | 2.78                            | ∑=1     |
+| **Weighted Average** |     1.481 | 2.463                        | | **Weighted Average** |     1.333 | 2.778                           | ∑=1     |
 | **Ratio**            |     1.111 | 0.887                        | | **Ratio**            |         1 | 1                               |         |
 | **Ratio-1**          |     0.111 | -0.113                       | | **Ratio-1**          |         0 | 0                               |         |
 

@@ -26,21 +26,21 @@ Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.
 
 See README.md at https://github.com/AxelWalthelm/ContourTracing/ for more information.
 
-	Definition of direction
-		                            x    
-	+---------------------------------->  
-	|               (0, -1)               
-	|                  0  up              
-	|                  ^                  
-	|                  |                  
-	|                  |                  
-	| (-1, 0) 3 <------+------> 1 (1, 0)  
-	|       left       |      right       
-	|                  |                  
-	|                  v                  
-	|                  2  down            
+    Definition of direction
+                                    x    
+    +---------------------------------->  
+    |               (0, -1)               
+    |                  0  up              
+    |                  ^                  
+    |                  |                  
+    |                  |                  
+    | (-1, 0) 3 <------+------> 1 (1, 0)  
+    |       left       |      right       
+    |                  |                  
+    |                  v                  
+    |                  2  down            
   y |               (0, 1)                
-	v                                     
+    v                                     
 
 Tracing contour of 4-connected objects
 ----------------------------------------
