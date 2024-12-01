@@ -326,9 +326,9 @@ If the sequence does not end with ER, it has an unambiguous equivalent sequence 
 |          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |        PN+PN+**P3** |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌ | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+EF |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+P2 |          4 | 11&nbsp;=&nbsp;3+3+3+2&nbsp;❌ | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+ER |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+PN |          4 | 12&nbsp;=&nbsp;3+3+3+3&nbsp;❌ | ⅓·⅓·⅓·0 |
-| **Weighted Average** |      1.48 | 2.46                         | | **Weighted Average** |      1.33 | 2.78                            | ∑=1     |
-| **Ratio**            |      1.11 | 0.89                         | | **Ratio**            |         1 | 1                               |         |
-| **Ratio-1**          |      0.11 | -0.11                        | | **Ratio-1**          |         0 | 0                               |         |
+| **Weighted Average** |     1.481 | 2.463                        | | **Weighted Average** |      1.33 | 2.78                            | ∑=1     |
+| **Ratio**            |     1.111 | 0.887                        | | **Ratio**            |         1 | 1                               |         |
+| **Ratio-1**          |     0.111 | -0.113                       | | **Ratio-1**          |         0 | 0                               |         |
 
 <!--
 >>> ptf = (1+2)/3+(3+4)/9+(5+6)/27+(7+8)/(27*2)  # weighted pixel-tests FECTS
@@ -355,19 +355,18 @@ Based on this table we can also see that rule P3 does not happen very often.
 It appears only in three sequences.
 It can appear on its own with a probability of 1/9th, it can appear in PN+P3 with a probability of 1/36th,
 and it can appear in PN+PN+P3 with a probability of 1/72th.
-**Rule P3 has a probability of about 15%**, which is a little higher than in the simple estimate above
+**Rule P3 has a probability of about 15.3%**, which is a little higher than in the simple estimate above,
 because probability mass is shifted from PN+P1 to P3,
-but still quite infrequent for a rule that causes more trouble than it solves.
+but rule P3 is still quite infrequent for a rule that causes more trouble than it solves.
 
-So our estimate is: **FECTS performs 11% fewer pixel-tests, but does 11% more steps**.
+So our estimate is: **FECTS performs 11.3% fewer pixel-tests, but does 11.1% more steps**.
 
 Each extra step of FECTS causes an extra termination check.
 FECTS may also have to do up to three additional steps to close the contour edge-wise.
-A pixel-test often needs to read from slow main memory, while a termination check uses the algorithm state,
-which is likely to be high in the CPU cache hierarchy at all times and therfore very fast.
-This which would favor FECTS.
-But let's not make assumptions about the processor architecture and call it a draw:
-**FECTS is as fast as Pavlidis**.
+But for this small price **FECTS terminates consistently**.
+
+If a pixel-test is slower or faster than a termination check depends very much on the implementation,
+so let's call it a draw and say: **FECTS is as fast as Pavlidis**.
 
 ### Emitting the Contour
 
