@@ -251,20 +251,45 @@ These finite sequences are concatenated randomly according to their probability.
 Longer sequences have lower probability.
 Every sequence that ends with ER may possibly continue with EL and because ER+EL is P3 it is ambiguous and needs to be split into three longer sequences.
 If the sequence does not end with ER, it has an unambiguous equivalent sequence in P1, P2, P3, and PN, and we can stop making it longer.
- We can also stop after three right turns, because this can happen only for a single-pixel contour object, i.e. ER+ER+ER can only happen once in a sequence, and only at the start.
- This violates the assumption of rules ER, EF, and ER to be independent.
- The single-pixel case is excluded from this statistical analysis by adjusting the probability of ER+ER+ER to zero.
+ We will stop after four right turns, because this can happen only for a single-pixel contour object,
+ i.e. ER+ER+ER+ER can not happen in an infinite sequence.
+ The probability weight of ER+ER+ER+ER is adjusted from 1.3% to zero.
 
-|   FECTS Sequence |     Steps | Pixel-Tests                 | Pavlidis Sequence |     Steps | Pixel-Tests                  | Probability Weight |
-|-----------------:|----------:|:----------------------------|------------------:|----------:|:-----------------------------|:-------------------|
-|               EL |         1 | 1                           |                P1 |         1 | 1                            | ⅓                  |
-|               EF |         1 | 2                           |                P2 |         1 | 2                            | ⅓                  |
-|            ER+EL | ❌&nbsp;2 | 3&nbsp;=&nbsp;2+1          |            **P3** | ✔️&nbsp;1 | 3                            | ⅓·⅓                |
-|            ER+EF |         2 | 4&nbsp;=&nbsp;2+2&nbsp;✔️  |             PN+P2 |          2 | 5&nbsp;=&nbsp;3+2&nbsp;❌   | ⅓·⅓                |
-|         ER+ER+EL | ❌&nbsp;3 | 5&nbsp;=&nbsp;2+2+1&nbsp;✔️|         PN+**P3** | ✔️&nbsp;2 | 6&nbsp;=&nbsp;3+3&nbsp;❌   | ⅓·⅓·½              |
-|         ER+ER+EF |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️|          PN+PN+P2 |          3 | 8&nbsp;=&nbsp;3+3+2&nbsp;❌ | ⅓·⅓·½              |
-|         ER+ER+ER |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️|          PN+PN+PN |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌ | ⅓·⅓·0              |
-| **Weighted Sum** |      1.44 | 2.39                        |  **Weighted Sum** | 1.33      | 2.67                         | ∑=1                |
+|       FECTS Sequence |     Steps | Pixel-Tests                  | |    Pavlidis Sequence |     Steps | Pixel-Tests                     | Weight  |
+|:---------------------|----------:|:-----------------------------|-|:---------------------|----------:|:--------------------------------|:--------|
+|                   EL |         1 | 1                            | |                   P1 |         1 | 1                               | ⅓       |
+|                   EF |         1 | 2                            | |                   P2 |         1 | 2                               | ⅓       |
+|                ER+EL | ❌&nbsp;2 | 3&nbsp;=&nbsp;2+1            | |              **P3** | ✔️&nbsp;1 | 3                               | ⅓·⅓     |
+|                ER+EF |         2 | 4&nbsp;=&nbsp;2+2&nbsp;✔️    | |               PN+P2 |          2 | 5&nbsp;=&nbsp;3+2&nbsp;❌      | ⅓·⅓     |
+|             ER+ER+EL | ❌&nbsp;3 | 5&nbsp;=&nbsp;2+2+1&nbsp;✔️ | |            PN+**P3** | ✔️&nbsp;2 | 6&nbsp;=&nbsp;3+3&nbsp;❌      | ⅓·⅓·⅓   |
+|             ER+ER+EF |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️  | |            PN+PN+P2 |          3 | 8&nbsp;=&nbsp;3+3+2&nbsp;❌    | ⅓·⅓·⅓   |
+|          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |         PN+PN+PN+P1 |          4 | 10&nbsp;=&nbsp;3+3+3+1&nbsp;❌ | ⅓·⅓·⅓·½ |
+|          ER+ER+ER+EF |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+P2 |          4 | 11&nbsp;=&nbsp;3+3+3+2&nbsp;❌ | ⅓·⅓·⅓·½ |
+|          ER+ER+ER+ER |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+PN |          4 | 12&nbsp;=&nbsp;3+3+3+3&nbsp;❌ | ⅓·⅓·⅓·0 |
+| **Weighted Average** |      1.48 | 2.46                         | | **Weighted Average** |      1.33 | 2.80                            | ∑=1     |
+| **Ratio**            |      1.11 | 0.88                         | | **Ratio**            |         1 | 1                               |         |
+| **Ratio-1**          |      0.11 | -0.12                        | | **Ratio-1**          |         0 | 0                               |         |
+
+<!--
+>>> ptf = (1+2)/3+(3+4)/9+(5+6)/27+(7+8)/(27*2)  # weighted pixel-tests FECTS
+>>> ptp = (1+2)/3+(3+5)/9+(6+8)/27+(10+11)/(27*2)  # weighted pixel-tests Pavlidis
+>>> stf = (1+1)/3+(2+2)/9+(3+3)/27+(4+4)/(27*2)  # weighted steps FECTS
+>>> stp = (1+1)/3+(1+2)/9+(2+3)/27+(4+4)/(27*2)  # weighted steps Pavlidis
+>>> ptf, ptp, stf, stp
+(2.462962962962963, 2.7962962962962963, 1.4814814814814816, 1.3333333333333333)
+>>> stf/stp, ptf/ptp
+(1.1111111111111114, 0.8807947019867549)
+>>> stf/stp-1, ptf/ptp-1
+(0.11111111111111138, -0.11920529801324509)
+-->
+
+In this way we model that PN+P1 will never happen.
+Some aspects that are less relevant for this analysis are not modeled.
+Infinite sequences model long contours, obviously. They do not model the closing of the contour.
+A generated sequence may have an impossible path, e.g. one that intersects itself or leaves the image.
+Also there is a slight asymmetry in forbidding ER+ER+ER+ER and allowing EL+EL+EL+EL,
+but we keep the re-distributed probability mass in the ER+ER+ER paths.
+The impact on the results should be low.
 
 Based on this table it becomes obvious that rule P3 does not happen very often.
 It appears only in two sequences.
@@ -272,21 +297,15 @@ It can appear on its own with a probability of 1/9th and it can appear in PN+P3 
 **Rule P3 has a probability of about 14%** only.
 
 As a plausibility check, let's assume for a moment that pixel P1, P2, and P3 are randomly set with a 50% probability.
-This is a different assumption to the one above, but intuitively it is similar, so the result should be similar.
+This is a simpler and less realistic model, but intuitively it is similar, so the result should be similar.
 Rule P3 is only activated in case P1 and P2 are background and P3 is foreground.
-The probability for this is now 0.5³ or 12.5%.&nbsp;✔️
+The probability for this is now 0.5³ or 13%.&nbsp;✔️
 
-| Weighted Average |    FECTS | Pavlidis |     Ratio |
-|-----------------:|---------:|---------:|----------:|
-|      Pixel-Tests |     2.39 |     2.67 |           |
-|            Steps |     1.44 |     1.33 | **1.083** |
-| Pixel-Tests/Step | **1.65** | **2.00** | **0.827** |
-
-So our estimate is: **FECTS performs 17% fewer pixel-tests, but does only 8% more steps**.
+So our estimate is: **FECTS performs 12% fewer pixel-tests, but does only 11% more steps**.
 
 Each extra step of FECTS causes an extra termination check.
 FECTS may also have to do up to three additional steps to close the contour edge-wise.
-But for this small price **FECTS is simpler, usually faster, and it terminates consistently**.
+But for this small price **FECTS is simpler, as fast, and it terminates consistently**.
 
 ### Emitting the Contour
 
@@ -321,6 +340,10 @@ seems to have been designed to only trace the outermost outer contour and start 
 so technically speaking this point is the only valid start point.
 
 **FECTS can start on any pixel edge of the contour**, no matter if it is an outer contour or an inner contour.
+
+### Summary
+
+Pavlidis' third rule is harmful. Less is more.
 
 ## Experimental Performance
 
