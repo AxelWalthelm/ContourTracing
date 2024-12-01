@@ -242,9 +242,69 @@ For the same reason PN+P1 will never happen, because if PN applies, pixel P3 is 
 ### Theoretical Performance Gain
 
 How many pixel-tests are saved and how many extra steps are needed depends on the frequency of the rules.
-Since Pavlidis' rules obviously are not independent, let's rather assume that FECTS' rules are independent and have the same frequency.
-While this assumption is not true for some artificial shapes like an axis-aligned rectangle, for noisy real world shapes it is plausible to assume that we go forward in about one third of the steps.
-In a closed contour, left and right turns pretty much balance out, so the two cases of going left or right gets half of the remaining two thirds probability.
+Let's look for models that allow to do a statistical analysis.
+
+#### Random Pixel Model
+
+First let's assume that **for each step the pixels are randomly set** with a 50% probability.
+This is a simple and not very realistic model.
+White noise images are actually not very good for testing contour tracing.
+The implementation was tested using a more complex random image generation scheme,
+which produces more structured foreground and background regions (see examples below).
+
+But this simple model is good for a quick first estimate,
+because it gives us an independent probability for each rule.
+For example rule P3 is only activated in case P1 and P2 are background and P3 is foreground.
+The probability for this is now 0.5³ or 1/8th.
+So based on this model, **rule P3 has a probability of about 13%** only.
+
+Using the probability of each rule as a weight,
+we get the average number of steps and the average number of pixel-tests per edge.
+Then we can compare the relative amount of steps and pixel-tests between Pavlidis and FECTS.
+
+|             Pavlidis | Steps |         Edges | Pixel-Tests   | Weight | |                FECTS | Steps | Edges | Pixel-Tests    | Weight |
+|---------------------:|:-----:|--------------:|:--------------|:-------|-|---------------------:|:-----:|------:|:---------------|:-------|
+|                   P1 |   1   |             1 | 1             | 1/2    | |                   EL |   1   |     1 | 1              | 1/2    |
+|                   P2 |   1   |             1 | 2             | 1/4    | |                   EF |   1   |     1 | 2              | 1/4    |
+|                   P3 |   1   | ✔️&nbsp;**2** | 3             | 1/8    | |                      |       |       |                |        |
+|                   PN |   1   |             1 | **3**&nbsp;❌ | 1/8    | |                   ER |   1   |     1 | **2**&nbsp;✔️  | 1/4    |
+| **Weighted Average** |   1   |         1.125 | 1.75          | ∑=1    | | **Weighted Average** |   1   |     1 | 1.5            | ∑=1    |
+|    **Avg. per Edge** |  0.89 |             1 | 1.555         |        | |    **Avg. per Edge** |   1   |     1 | 1.5            |        |
+|            **Ratio** |   1   |               | 1             |        | |            **Ratio** | 1.125 |       | 0.964          |        |
+|          **Ratio-1** |   0   |               | 0             |        | |            **Ratio** | 0.125 |       | -0.036        |        |
+
+<!--
+>>> avg_edges_p = 1/2 + 1/4 + 2/8 + 1/8
+>>> avg_edges_f = 1/2 + 1/4 + 1/4
+>>> avg_tests_p = 1/2 + 2/4 + 3/8 + 3/8
+>>> avg_tests_f = 1/2 + 2/4 + 2/4
+>>> avg_edges_p, avg_tests_p, avg_edges_f, avg_tests_f
+(1.125, 1.75, 1.0, 1.5)
+>>> step_per_edge_p = 1/avg_edges_p
+>>> tests_per_edge_p = avg_tests_p/avg_edges_p
+>>> step_per_edge_f = 1/avg_edges_f
+>>> tests_per_edge_f = avg_tests_f/avg_edges_f
+>>> step_per_edge_p, tests_per_edge_p, step_per_edge_f, tests_per_edge_f
+(0.8888888888888888, 1.5555555555555556, 1.0, 1.5)
+>>> step_per_edge_f / step_per_edge_p, tests_per_edge_f / tests_per_edge_p
+(1.125, 0.9642857142857143)
+>>> step_per_edge_f / step_per_edge_p - 1, tests_per_edge_f / tests_per_edge_p - 1
+(0.125, -0.0357142857142857)
+-->
+
+So our quick estimate is: **FECTS performs 4% fewer pixel-tests, but does 13% more steps**.
+That looks promising, but for a clearer conclusion a more refined analysis may be in order.
+
+#### Random Next Edge Model
+
+The above simple model implied that all rules are independent.
+As we have seen above, Pavlidis' rules are *not* independent.
+For an improved estimate, let's assume that FECTS' rules are independent and have the same frequency.
+In other words: **in every step the probability to go left, forward, or right is the same**.
+While this assumption is not true for some artificial shapes like an axis-aligned rectangle,
+for noisy real world shapes it is plausible to assume that we go forward in about 1/3rd of the steps.
+In a closed contour, left and right turns are very much balanced,
+so the two cases of going left or right get half of the remaining 2/3rd probability, i.e. 1/3rd each.
 
 For a statistical analysis we now try to generate all possible infinite sequences of EL, EF, and ER from a small set of unambiguous finite sequences.
 These finite sequences are concatenated randomly according to their probability.
@@ -263,49 +323,51 @@ If the sequence does not end with ER, it has an unambiguous equivalent sequence 
 |                ER+EF |         2 | 4&nbsp;=&nbsp;2+2&nbsp;✔️    | |               PN+P2 |          2 | 5&nbsp;=&nbsp;3+2&nbsp;❌      | ⅓·⅓     |
 |             ER+ER+EL | ❌&nbsp;3 | 5&nbsp;=&nbsp;2+2+1&nbsp;✔️ | |            PN+**P3** | ✔️&nbsp;2 | 6&nbsp;=&nbsp;3+3&nbsp;❌      | ⅓·⅓·⅓   |
 |             ER+ER+EF |         3 | 6&nbsp;=&nbsp;2+2+2&nbsp;✔️  | |            PN+PN+P2 |          3 | 8&nbsp;=&nbsp;3+3+2&nbsp;❌    | ⅓·⅓·⅓   |
-|          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |         PN+PN+PN+P1 |          4 | 10&nbsp;=&nbsp;3+3+3+1&nbsp;❌ | ⅓·⅓·⅓·½ |
+|          ER+ER+ER+EL |         4 | 7&nbsp;=&nbsp;2+2+2+1&nbsp;✔️| |        PN+PN+**P3** |          3 | 9&nbsp;=&nbsp;3+3+3&nbsp;❌ | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+EF |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+P2 |          4 | 11&nbsp;=&nbsp;3+3+3+2&nbsp;❌ | ⅓·⅓·⅓·½ |
 |          ER+ER+ER+ER |         4 | 8&nbsp;=&nbsp;2+2+2+2&nbsp;✔️| |         PN+PN+PN+PN |          4 | 12&nbsp;=&nbsp;3+3+3+3&nbsp;❌ | ⅓·⅓·⅓·0 |
-| **Weighted Average** |      1.48 | 2.46                         | | **Weighted Average** |      1.33 | 2.80                            | ∑=1     |
-| **Ratio**            |      1.11 | 0.88                         | | **Ratio**            |         1 | 1                               |         |
-| **Ratio-1**          |      0.11 | -0.12                        | | **Ratio-1**          |         0 | 0                               |         |
+| **Weighted Average** |      1.48 | 2.46                         | | **Weighted Average** |      1.33 | 2.78                            | ∑=1     |
+| **Ratio**            |      1.11 | 0.89                         | | **Ratio**            |         1 | 1                               |         |
+| **Ratio-1**          |      0.11 | -0.11                        | | **Ratio-1**          |         0 | 0                               |         |
 
 <!--
 >>> ptf = (1+2)/3+(3+4)/9+(5+6)/27+(7+8)/(27*2)  # weighted pixel-tests FECTS
->>> ptp = (1+2)/3+(3+5)/9+(6+8)/27+(10+11)/(27*2)  # weighted pixel-tests Pavlidis
+>>> ptp = (1+2)/3+(3+5)/9+(6+8)/27+(9+11)/(27*2)  # weighted pixel-tests Pavlidis
 >>> stf = (1+1)/3+(2+2)/9+(3+3)/27+(4+4)/(27*2)  # weighted steps FECTS
 >>> stp = (1+1)/3+(1+2)/9+(2+3)/27+(4+4)/(27*2)  # weighted steps Pavlidis
 >>> ptf, ptp, stf, stp
-(2.462962962962963, 2.7962962962962963, 1.4814814814814816, 1.3333333333333333)
+(2.462962962962963, 2.7777777777777777, 1.4814814814814816, 1.3333333333333333)
 >>> stf/stp, ptf/ptp
-(1.1111111111111114, 0.8807947019867549)
+(1.1111111111111114, 0.8866666666666666)
 >>> stf/stp-1, ptf/ptp-1
-(0.11111111111111138, -0.11920529801324509)
+(0.11111111111111138, -0.1133333333333334)
 -->
 
-In this way we model that PN+P1 will never happen.
-Some aspects that are less relevant for this analysis are not modeled.
+In this way we *do* model that PN+P1 will never happen.
+Some aspects that are less relevant for this analysis are still not modeled.
 Infinite sequences model long contours, obviously. They do not model the closing of the contour.
 A generated sequence may have an impossible path, e.g. one that intersects itself or leaves the image.
 Also there is a slight asymmetry in forbidding ER+ER+ER+ER and allowing EL+EL+EL+EL,
-but we keep the re-distributed probability mass in the ER+ER+ER paths.
+but at least we keep the re-distributed probability mass in the ER+ER+ER paths.
 The impact on the results should be low.
 
-Based on this table it becomes obvious that rule P3 does not happen very often.
-It appears only in two sequences.
-It can appear on its own with a probability of 1/9th and it can appear in PN+P3 with a probability of 1/36th.
-**Rule P3 has a probability of about 14%** only.
+Based on this table we can also see that rule P3 does not happen very often.
+It appears only in three sequences.
+It can appear on its own with a probability of 1/9th, it can appear in PN+P3 with a probability of 1/36th,
+and it can appear in PN+PN+P3 with a probability of 1/72th.
+**Rule P3 has a probability of about 15%**, which is a little higher than in the simple estimate above
+because probability mass is shifted from PN+P1 to P3,
+but still quite infrequent for a rule that causes more trouble than it solves.
 
-As a plausibility check, let's assume for a moment that pixel P1, P2, and P3 are randomly set with a 50% probability.
-This is a simpler and less realistic model, but intuitively it is similar, so the result should be similar.
-Rule P3 is only activated in case P1 and P2 are background and P3 is foreground.
-The probability for this is now 0.5³ or 13%.&nbsp;✔️
-
-So our estimate is: **FECTS performs 12% fewer pixel-tests, but does only 11% more steps**.
+So our estimate is: **FECTS performs 11% fewer pixel-tests, but does 11% more steps**.
 
 Each extra step of FECTS causes an extra termination check.
 FECTS may also have to do up to three additional steps to close the contour edge-wise.
-But for this small price **FECTS is simpler, as fast, and it terminates consistently**.
+A pixel-test often needs to read from slow main memory, while a termination check uses the algorithm state,
+which is likely to be high in the CPU cache hierarchy at all times and therfore very fast.
+This which would favor FECTS.
+But let's not make assumptions about the processor architecture and call it a draw:
+**FECTS is as fast as Pavlidis**.
 
 ### Emitting the Contour
 
@@ -341,7 +403,7 @@ so technically speaking this point is the only valid start point.
 
 **FECTS can start on any pixel edge of the contour**, no matter if it is an outer contour or an inner contour.
 
-### Summary
+### Conclusion
 
 Pavlidis' third rule is harmful. Less is more.
 
@@ -392,6 +454,7 @@ On some CPU architectures this optimization results in only moderate speed-up. B
 
 Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 without GPU and compiled with Visual Studio Community 2015 still shows that tracing all image contours in a randomly generated image is 30% faster with the current implementation than OpenCV (provided seed points of all contours are known):
 
+```
     0 (1): 165560900 ns, 296505 pix, 558 ns/pix
     1 (2): 118987900 ns, 246920 pix, 481 ns/pix
     2 (7): 588043300 ns, 1566531 pix, 375 ns/pix
@@ -403,7 +466,7 @@ Speed tests on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 withou
     time OpenCV:  3107149100 ns, 9594334 pix, 323 ns/pix
     time FECTS:   1983026200 ns, 9594334 pix, 206 ns/pix
     time ratio: 0.638
-
+```
 
 ## Functional Testing
 
