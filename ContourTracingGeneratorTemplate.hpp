@@ -291,15 +291,19 @@ namespace o__NAMESPACE__o
 		const int width = image.cols;
 		const int height = image.rows;
 		o__NAMESPACE__o_Assert(width > 0 && height > 0, "image is empty");
-		const int width_m1 = width - 1;
-		const int height_m1 = height - 1;
 
-		const uint8_t* image_ptr = image.ptr(0, 0);
+		const uint8_t* const image_ptr = image.ptr(0, 0);
 		const int stride = height == 1 ? width : int(image.ptr(1, 0) - image_ptr);
 		o__NAMESPACE__o_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
+		return findContour(contour, image_ptr, width, height, stride, x, y, dir, clockwise, do_suppress_border, stop);
+	}
+
+	template<typename TContour>
+	int findContour(TContour& contour, const uint8_t* const image, const int width, const int height, const int stride, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
+	{
 		o__NAMESPACE__o_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
-		o__NAMESPACE__o_Assert(isForeground(x, y, image_ptr, width, height, stride), "seed pixel is not foreground");
+		o__NAMESPACE__o_Assert(isForeground(x, y, image, width, height, stride), "seed pixel is not foreground");
 
 		if (dir == -1)
 		{
@@ -346,7 +350,7 @@ namespace o__NAMESPACE__o
 
 			for (dir = 0; dir < 4; dir++)
 			{
-				if (!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				if (!isLeftForeground(x, y, dir, clockwise, image, width, height, stride))
 					break;
 			}
 
@@ -354,7 +358,7 @@ namespace o__NAMESPACE__o
 			{
 				for (dir = 0; dir < 4; dir++)
 				{
-					if (!isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+					if (!isLeftForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 						break;
 				}
 			}
@@ -362,13 +366,13 @@ namespace o__NAMESPACE__o
 			o__NAMESPACE__o_Assert(dir < 4, "bad seed pixel");
 		}
 
-		if (isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride) &&
-			isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+		if (isLeftForeground(x, y, dir, clockwise, image, width, height, stride) &&
+			isForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 		{
 			moveForward(x, y, dir);
 		}
 
-		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image_ptr, width, height, stride), "bad seed direction");
+		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image, width, height, stride), "bad seed direction");
 
 		const int start_x = x;
 		const int start_y = y;
@@ -377,8 +381,8 @@ namespace o__NAMESPACE__o
 		const bool is_stop_in = stop != NULL && stop->dir >= 0 && stop->dir < 4;
 		if (is_stop_in)
 		{
-			o__NAMESPACE__o_Assert(isForeground(stop->x, stop->y, image_ptr, width, height, stride), "stop pixel is not foreground");
-			o__NAMESPACE__o_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise, image_ptr, width, height, stride), "stop pixel has bad direction");
+			o__NAMESPACE__o_Assert(isForeground(stop->x, stop->y, image, width, height, stride), "stop pixel is not foreground");
+			o__NAMESPACE__o_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise, image, width, height, stride), "stop pixel has bad direction");
 		}
 		const int stop_x = is_stop_in ? stop->x : start_x;
 		const int stop_y = is_stop_in ? stop->y : start_y;
@@ -394,7 +398,7 @@ namespace o__NAMESPACE__o
 		// on contour which is inside of the image, i.e. not only edges at image border.
 		// Otherwise it is always true.
 		bool is_pixel_valid = !do_suppress_border ||
-			hasPixelNonBorderEdgeBackwards(x, y, dir, clockwise, image_ptr, width, height, stride);
+			hasPixelNonBorderEdgeBackwards(x, y, dir, clockwise, image, width, height, stride);
 
 		if (max_contour_length > 0)
 		{
@@ -441,7 +445,7 @@ namespace o__NAMESPACE__o
 			do
 			{
 				// (rule 1)
-				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				if (isLeftForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 				{
 					contour.emplace_back(x, y);
 					moveForward(x, y, dir);
@@ -453,7 +457,7 @@ namespace o__NAMESPACE__o
 					is_pixel_valid = true;
 				}
 				// (rule 2)
-				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				else if (isForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 				{
 					if (is_pixel_valid)
 					{
@@ -478,7 +482,7 @@ namespace o__NAMESPACE__o
 #else
 
 			// pointer to current pixel
-			const uint8_t* pixel = &image_ptr[x + y * stride];
+			const uint8_t* pixel = &image[x + y * stride];
 
 			// constants to address 8-connected neighbours of pixel
 			constexpr int off_00 = 0;
@@ -490,6 +494,9 @@ namespace o__NAMESPACE__o
 			const int off_pm = off_p0 + off_0m;
 			const int off_mp = off_m0 + off_0p;
 			const int off_mm = off_m0 + off_0m;
+
+			const int width_m1 = width - 1;
+			const int height_m1 = height - 1;
 			//o__#__o//
 			//o__#__o// from here on we can use all pixel accessing generator macros
 			//o__#__o//
