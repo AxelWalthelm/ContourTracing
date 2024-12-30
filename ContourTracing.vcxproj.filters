@@ -2,22 +2,40 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="ContourTracing.hpp" />
-    <ClInclude Include="HighResolutionTimer.h" />
     <ClInclude Include="ContourChainApproxSimple.hpp" />
     <ClInclude Include="ContourTracingBitonic.hpp" />
     <ClInclude Include="ContourTracingThresh.hpp" />
+    <ClInclude Include="Test\HighResolutionTimer.h">
+      <Filter>Test</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ContourTracingTest.cpp" />
-    <ClCompile Include="HighResolutionTimer.cpp" />
+    <ClCompile Include="Test\ContourTracingTest.cpp">
+      <Filter>Test</Filter>
+    </ClCompile>
+    <ClCompile Include="Test\HighResolutionTimer.cpp">
+      <Filter>Test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="ContourTracingGenerator.py" />
+    <Filter Include="Generator">
+      <UniqueIdentifier>{15c27908-79f0-44a4-ba61-7ed911fc5f13}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Test">
+      <UniqueIdentifier>{51ac4adf-1710-434b-9135-8f91f92ca3f3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ContourTracingGeneratorTemplate.hpp" />
+    <CustomBuild Include="Generator\ContourTracingGenerator.py">
+      <Filter>Generator</Filter>
+    </CustomBuild>
+    <CustomBuild Include="Generator\Preprocessor.py">
+      <Filter>Generator</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Preprocessor.py" />
+    <Text Include="Generator\ContourTracingGeneratorTemplate.hpp">
+      <Filter>Generator</Filter>
+    </Text>
   </ItemGroup>
 </Project>

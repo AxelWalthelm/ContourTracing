@@ -162,16 +162,16 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ContourTracingTest.cpp" />
-    <ClCompile Include="HighResolutionTimer.cpp" />
+    <ClCompile Include="Test\ContourTracingTest.cpp" />
+    <ClCompile Include="Test\HighResolutionTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ContourChainApproxSimple.hpp" />
     <ClInclude Include="ContourTracing.hpp" />
     <ClInclude Include="ContourTracingBitonic.hpp" />
     <ClInclude Include="ContourTracingThresh.hpp" />
-    <ClInclude Include="HighResolutionTimer.h" />
-    <Text Include="ContourTracingGeneratorTemplate.hpp">
+    <ClInclude Include="Test\HighResolutionTimer.h" />
+    <Text Include="Generator\ContourTracingGeneratorTemplate.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -191,12 +191,12 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="ContourTracingGenerator.py">
+    <CustomBuild Include="Generator\ContourTracingGenerator.py">
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="Preprocessor.py">
+    <CustomBuild Include="Generator\Preprocessor.py">
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>
