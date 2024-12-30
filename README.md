@@ -30,6 +30,9 @@ The resulting algorithm is quite similar to Theo Pavlidis' algorithm, but it is 
 The contour tracing function is implemented in ContourTracing.hpp mostly using C style.
 It is a C++ template function to allow it to be easily used with OpenCV and STL,
 but turning it into a pure C function should be easy enough.
+The first step would be to decide which C container you want to use instead of std::vector.
+Test if adding to this container is as fast as an inlined and speed-optimized std::vector::emplace_back()
+and let me know your results.
 
 ```
 template<typename TContour, typename TImage>

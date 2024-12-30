@@ -2,15 +2,22 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="ContourTracing.hpp" />
-    <ClInclude Include="ContourTracingGeneratorTemplate.hpp" />
     <ClInclude Include="HighResolutionTimer.h" />
     <ClInclude Include="ContourChainApproxSimple.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ContourTracingGenerator.py" />
+    <ClInclude Include="ContourTracingBitonic.hpp" />
+    <ClInclude Include="ContourTracingThresh.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ContourTracingTest.cpp" />
     <ClCompile Include="HighResolutionTimer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="ContourTracingGenerator.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ContourTracingGeneratorTemplate.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Preprocessor.py" />
   </ItemGroup>
 </Project>

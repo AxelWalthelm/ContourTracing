@@ -1,14 +1,64 @@
 import os
-from stat import S_IREAD, S_IWUSR
+import sys
 import re
+from stat import S_IREAD, S_IWUSR
+import Preprocessor
 
 directory = os.path.dirname(os.path.abspath(__file__))
 template_file = os.path.join(directory, "ContourTracingGeneratorTemplate.hpp")
-output_file = os.path.join(directory, 'ContourTracing.hpp')
+output_file_of_variants = {
+	'bool': 'ContourTracing.hpp',
+	'thresh': 'ContourTracingThresh.hpp',
+	'bitonic': 'ContourTracingBitonic.hpp',
+}
+
+variant = (sys.argv[1:2] or ['bool'])[0]
+if len(sys.argv) != 2 or variant not in ('bool', 'thresh', 'bitonic'):
+	print("Usage: ContourTracingGenerator.py variant")
+	print("Possible values for variant are:")
+	print("  bool: input image is 1 byte per pixel and 0 is background; compatible with OpenCV")
+	print("  thresh: input image is 1 byte per pixel and values <= threshold are background; compatible with OpenCV")
+	print("  bitonic: input image is 1 bit per pixel and 0 is background")
+	exit(-1)
+
+output_file = os.path.join(directory, output_file_of_variants[variant])
+
+# pre-pre-preprocessing variables
+ppvars = {
+	'o__ONE_BYTE_PER_PIXEL__o': '1' if variant != 'bitonic' else '0',
+	'o__ONE_BIT_PER_PIXEL__o': '1' if variant == 'bitonic' else '0',
+	'o__THRESHOLD_IS_USED__o': '1' if variant == 'thresh' else '0',
+	'o__THRESHOLD_PARAMETER__o': "##, int threshold" if variant == 'thresh' else "##",
+	'o__IMAGE_PARAMETER__o': "##, const uint8_t* const image, const int width, const int height, const int stride" + (
+		                     ", const int threshold" if variant == 'thresh' else ""),
+	'o__IMAGE_ARGUMENTS__o': "##, image, width, height, stride" + (
+		                     ", threshold" if variant == 'thresh' else ""),
+}
+ppvars['o__IMAGE_PTR_ARGUMENTS__o'] = re.sub(r"\bimage\b", "image_ptr", ppvars['o__IMAGE_ARGUMENTS__o'])
 
 print('ContourTracingGenerator.py -> {}'.format(output_file))
 
 namespace = "FECTS"
+namespace_ = namespace + "_"
+if variant == 'thresh':
+	namespace += "_T"
+if variant == 'bitonic':
+	namespace += "_B"
+
+def strip_parentheses(term):
+	term = term.strip()
+	if term[0] == '(' and term[-1] == ')':
+		term = term[1, -1].strip()
+	return term
+
+def add_parentheses(term):
+	return "({})".format(term)
+
+def check_parentheses(term):
+	term = strip_parentheses(term)
+	if re.search(r"\W", term):  # anything more complicated than a single variable?
+		term = add_parentheses(term)
+	return term
 
 warning_generated_code = """
 #############################################################################
@@ -80,6 +130,17 @@ def pixel_off_code(vec):
 	return "off_" + sign[vec[0]] + sign[vec[1]]
 
 def is_value_foreground_code(value_code):
+	if variant == 'bitonic':
+		m = re.match(r"^\s*(\w+)\s*\[(.*)\]\s*$", value_code)
+		array_pointer, array_index = m.groups()
+		if array_pointer == 'image':
+			return "bittest(image, {})".format(array_index)
+		return "bittest(image, {} + {})".format(check_parentheses(array_pointer), check_parentheses(array_index))
+
+	if variant == 'thresh':
+		return "{} > threshold".format(value_code)
+
+	assert variant == 'bool'
 	return "{} != 0".format(value_code)
 
 def is_pixel_foreground_code(vec):
@@ -312,7 +373,7 @@ def make_trace_generic_comment_code(indent):
 	return code
 
 
-if False:
+if False:  # test code
 	for clockwise in (True, False):
 		for dir in range(4):
 			indent = ' ' * 2
@@ -322,19 +383,26 @@ if False:
 	exit()
 
 
+############################################################################################
+########################################### main ###########################################
+############################################################################################
+
 with open(template_file) as f:
 	template = f.read()
 
-lines = (template.replace('o__NAMESPACE__o', namespace)
-				 .replace('o__WARNING_CODE_IS_GENERATED__o', warning_generated_code)
-				 .replace('o__INTRODUCTION__o', introduction)
-				 .splitlines())
+template = re.sub(r"\bo__NAMESPACE__o\b", namespace, template)
+template = re.sub(r"\bo__NAMESPACE__o_\B", namespace_, template)  # FECTS_assert etc.
+template = re.sub(r"\bo__WARNING_CODE_IS_GENERATED__o\b", warning_generated_code, template)
+template = re.sub(r"\bo__INTRODUCTION__o\b", introduction, template)
+lines = template.splitlines()
+
+Preprocessor.Process(lines, ppvars, lambda t: "//o__#__o//" in t, template_file)
 
 # remove lines which only comment the template or which contain code to pacify syntax checkers
 lines = [l for l in lines if "//o__#__o//" not in l]
 
 for line_index, line in enumerate(lines):
-	m = re.match(r'^(\s*)(.*)o__TRACE_STEP_(C?CW)_DIR_([0-3])__o\s*;\s*(.*)$', line)
+	m = re.match(r'^(\s*)(.*)\bo__TRACE_STEP_(C?CW)_DIR_([0-3])__o\b\s*;\s*(.*)$', line)
 	if m:
 		indent, code_before, clockwise, dir, code_after = m.groups()
 		assert not code_before
@@ -342,7 +410,7 @@ for line_index, line in enumerate(lines):
 		lines[line_index] = make_trace_step_code(int(dir), clockwise == 'CW', indent)
 		continue
 
-	m = re.match(r'^(\s*)(.*)o__TRACE_GENERIC_COMMENT__o\s*;\s*(.*)$', line)
+	m = re.match(r'^(\s*)(.*)\bo__TRACE_GENERIC_COMMENT__o\b\s*;\s*(.*)$', line)
 	if m:
 		indent, code_before, code_after = m.groups()
 		assert not code_before
@@ -351,19 +419,19 @@ for line_index, line in enumerate(lines):
 		continue
 
 	while True:
-		m = re.match(r'^(.*)o__isValueForeground\(\s*(.*?)\s*\)__o(.*)$', line)
+		m = re.match(r'^(.*)\bo__isValueForeground\(\s*(.*?)\s*\)__o\b(.*)$', line)
 		if m:
 			code_before, args, code_after = m.groups()
 			line = code_before + is_value_foreground_code(args) + code_after
 			continue
 
-		m = re.match(r'^(.*)o__isForwardBorderDir([0-3])__o(.*)$', line)
+		m = re.match(r'^(.*)\bo__isForwardBorderDir([0-3])__o\b(.*)$', line)
 		if m:
 			code_before, dir, code_after = m.groups()
 			line = code_before + is_forward_border_no_m1_code(int(dir)) + code_after
 			continue
 
-		m = re.match(r'^(.*)o__TRACE_CONTINUE_CONDITION__o(.*)$', line)
+		m = re.match(r'^(.*)\bo__TRACE_CONTINUE_CONDITION__o\b(.*)$', line)
 		if m:
 			code_before, code_after = m.groups()
 			indent = re.sub(r'[^\s]', ' ', code_before)
@@ -374,10 +442,18 @@ for line_index, line in enumerate(lines):
 		lines[line_index] = line
 		break
 
+new_file_content = '\n'.join(lines) + '\n'
 
-os.chmod(output_file, S_IREAD|S_IWUSR)  # make writable
+with open(output_file) as f:
+	old_file_content = f.read()
 
-with open(output_file, 'w') as f:
-	f.write('\n'.join(lines) + '\n')
+if new_file_content == old_file_content:
+	print("No changes.")
+else:
+	if os.path.isfile(output_file):
+		os.chmod(output_file, S_IREAD|S_IWUSR)  # make writable
 
-os.chmod(output_file, S_IREAD)  # make readonly
+	with open(output_file, 'w') as f:
+		f.write(new_file_content)
+
+	os.chmod(output_file, S_IREAD)  # make readonly

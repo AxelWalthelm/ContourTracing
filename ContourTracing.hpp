@@ -122,9 +122,9 @@ namespace FECTS
 		constexpr int dx[] = {0, 1, 0, -1};
 		constexpr int dy[] = {-1, 0, 1, 0};
 
-		inline bool isForeground(int x, int y, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isForeground(int x, int y, const uint8_t* const image, const int width, const int height, const int stride)
 		{
-			return x >= 0 && y >= 0 && x < width && y < height && image_ptr[x + y * stride] != 0;
+			return x >= 0 && y >= 0 && x < width && y < height && image[x + y * stride] != 0;
 		}
 
 		inline int turnLeft(int dir, bool clockwise)
@@ -152,23 +152,23 @@ namespace FECTS
 			y += dy[dir];
 		}
 
-		inline bool isLeftForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isLeftForeground(int x, int y, int dir, bool clockwise, const uint8_t* const image, const int width, const int height, const int stride)
 		{
 			moveLeft(x, y, dir, clockwise);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y, image, width, height, stride);
 		}
 
-		inline bool isLeftForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isLeftForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* const image, const int width, const int height, const int stride)
 		{
 			moveForward(x, y, dir);
 			moveLeft(x, y, dir, clockwise);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y, image, width, height, stride);
 		}
 
-		inline bool isForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* const image, const int width, const int height, const int stride)
 		{
 			moveForward(x, y, dir);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y, image, width, height, stride);
 		}
 
 		inline bool isForwardBorder(int x, int y, int dir, int width, int height)
@@ -185,7 +185,7 @@ namespace FECTS
 
 		// Analyze if the current edge or an earlier contour-edge of the given pixel is not on the image border
 		// by tracing up to 4 steps backward, but only if we stay on the given pixel.
-		inline bool hasPixelNonBorderEdgeBackwards(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool hasPixelNonBorderEdgeBackwards(int x, int y, int dir, bool clockwise, const uint8_t* const image, const int width, const int height, const int stride)
 		{
 			// turn around
 			dir = (dir + 2) % 4;
@@ -198,12 +198,12 @@ namespace FECTS
 					return true;
 
 				// (rule 1)
-				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				if (isLeftForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 				{
 					break; // next contour edge is on a different pixel
 				}
 				// (rule 2)
-				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				else if (isForwardForeground(x, y, dir, clockwise, image, width, height, stride))
 				{
 					break; // next contour edge is on a different pixel
 				}
@@ -300,6 +300,49 @@ namespace FECTS
 		return findContour(contour, image_ptr, width, height, stride, x, y, dir, clockwise, do_suppress_border, stop);
 	}
 
+
+	// Like findContour above, but with a C-style image.
+	// @param image Pointer to image memory, 1 byte per pixel, row-major.
+	// @param width Width of image, i.e. image dimension in x coordinate.
+	// @param height Height of image, i.e. image dimension in y coordinate.
+	// @param stride Stride of image, i.e. offset between start of consecutive rows, i.e. width plus padding bytes at the end of the image line.
+	// Pixel with non-zero value are foreground. All other pixels including those outside of image are background.
+	// 
+	// @param x Seed pixel x coordinate.
+	// @param y Seed pixel y coordinate.
+	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
+	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
+	// to ensure the resulting contour is consistently 8-connected thin.
+	// The start pixel will be the first pixel in contour, unless it has only contour edges at the image border and do_suppress_border is set.
+	//
+	// @param dir Direction to start contour tracing with. 0 is up, 1 is right, 2 is down, 3 is left.
+	// If value is -1, no direction dir is given and a direction is chosen automatically.
+	// This works well if the seed pixel is part of a single contour only.
+	// If the object to trace is very narrow and the seed pixel is touching the contour on both sides,
+	// the side with the smallest dir is chosen.
+	// Note that a seed pixel can be part of up to four different contours, but no more than one of them can be an outer contour.
+	// So if you expect an outer contour and an outer contour is found, you are good.
+	// Otherwise you need to be more specific.
+	//
+	// @param clockwise Indicates if outer contours are traced clockwise or counterclockwise.
+	// Note that inner contours run in the opposite direction.
+	// If tracing is clockwise, the traced edge is to the left of the current pixel (looking in the current direction),
+	// otherwise the traced edge is to the right.
+	// Set it to false to trace similar to OpenCV cv::findContours.
+	//
+	// @param do_suppress_border Indicates to omit pixels of the contour that are followed on border edges only.
+	// The contour still contains border pixels where it arrives at the image border or where it leaves tha image border,
+	// but not those pixel that only follow the border.
+	//
+	// @param stop Structure to control stop behavior and to return extra information on the state of tracing at the end.
+	//
+	// @return The total difference between left and right turns done during tracing.
+	// If a contour is traced completely, i.e. it is traced until it returns to the start edge,
+	// the value is 4 for an outer contour and -4 if it is an inner contour.
+	// When tracing stops due to stop.max_contour_length the contour is usually not traced completely.
+	// Even if all pixels have been found, up to 3 final edge tracing turns may not have been done,
+	// so if you somehow know that all pixels have been found, you can still use the sign of the return value
+	// to decide if it is an outer or inner contour.
 	template<typename TContour>
 	int findContour(TContour& contour, const uint8_t* const image, const int width, const int height, const int stride, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{

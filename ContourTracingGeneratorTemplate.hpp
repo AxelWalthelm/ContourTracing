@@ -23,6 +23,14 @@
 #define o__TRACE_STEP_CCW_DIR_1__o //o__#__o//
 #define o__TRACE_STEP_CCW_DIR_2__o //o__#__o//
 #define o__TRACE_STEP_CCW_DIR_3__o //o__#__o//
+//o__#__o// Preprocessor.py variables that control which variant (e.g. image type) the generated C++ file will be for
+#define o__ONE_BYTE_PER_PIXEL__o 1 //o__#__o//
+#define o__ONE_BIT_PER_PIXEL__o 0 //o__#__o//
+#define o__THRESHOLD_IS_USED__o 0 //o__#__o//
+#define o__THRESHOLD_PARAMETER__o //, int threshold //o__#__o//
+#define o__IMAGE_PARAMETER__o , const uint8_t* const image, const int width, const int height, const int stride //, const int threshold //o__#__o//
+#define o__IMAGE_ARGUMENTS__o , image, width, height, stride //, threshold //o__#__o//
+#define o__IMAGE_PTR_ARGUMENTS__o , image_ptr, width, height, stride //, threshold //o__#__o//
 //o__#__o//
 /*
 o__WARNING_CODE_IS_GENERATED__o
@@ -121,9 +129,9 @@ namespace o__NAMESPACE__o
 		constexpr int dx[] = {0, 1, 0, -1};
 		constexpr int dy[] = {-1, 0, 1, 0};
 
-		inline bool isForeground(int x, int y, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isForeground(int x, int y o__IMAGE_PARAMETER__o)
 		{
-			return x >= 0 && y >= 0 && x < width && y < height && o__isValueForeground(image_ptr[x + y * stride])__o;
+			return x >= 0 && y >= 0 && x < width && y < height && o__isValueForeground(image[x + y * stride])__o;
 		}
 
 		inline int turnLeft(int dir, bool clockwise)
@@ -151,23 +159,23 @@ namespace o__NAMESPACE__o
 			y += dy[dir];
 		}
 
-		inline bool isLeftForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isLeftForeground(int x, int y, int dir, bool clockwise o__IMAGE_PARAMETER__o)
 		{
 			moveLeft(x, y, dir, clockwise);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y o__IMAGE_ARGUMENTS__o);
 		}
 
-		inline bool isLeftForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isLeftForwardForeground(int x, int y, int dir, bool clockwise o__IMAGE_PARAMETER__o)
 		{
 			moveForward(x, y, dir);
 			moveLeft(x, y, dir, clockwise);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y o__IMAGE_ARGUMENTS__o);
 		}
 
-		inline bool isForwardForeground(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool isForwardForeground(int x, int y, int dir, bool clockwise o__IMAGE_PARAMETER__o)
 		{
 			moveForward(x, y, dir);
-			return isForeground(x, y, image_ptr, width, height, stride);
+			return isForeground(x, y o__IMAGE_ARGUMENTS__o);
 		}
 
 		inline bool isForwardBorder(int x, int y, int dir, int width, int height)
@@ -184,7 +192,7 @@ namespace o__NAMESPACE__o
 
 		// Analyze if the current edge or an earlier contour-edge of the given pixel is not on the image border
 		// by tracing up to 4 steps backward, but only if we stay on the given pixel.
-		inline bool hasPixelNonBorderEdgeBackwards(int x, int y, int dir, bool clockwise, const uint8_t* image_ptr, int width, int height, int stride)
+		inline bool hasPixelNonBorderEdgeBackwards(int x, int y, int dir, bool clockwise o__IMAGE_PARAMETER__o)
 		{
 			// turn around
 			dir = (dir + 2) % 4;
@@ -197,12 +205,12 @@ namespace o__NAMESPACE__o
 					return true;
 
 				// (rule 1)
-				if (isLeftForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				if (isLeftForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 				{
 					break; // next contour edge is on a different pixel
 				}
 				// (rule 2)
-				else if (isForwardForeground(x, y, dir, clockwise, image_ptr, width, height, stride))
+				else if (isForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 				{
 					break; // next contour edge is on a different pixel
 				}
@@ -236,17 +244,26 @@ namespace o__NAMESPACE__o
 		int y;
 	};
 
+#if o__ONE_BYTE_PER_PIXEL__o //o__#__o//
 	// @param contour Receives the resulting contour points. It should be initially empty if contour tracing starts new (but no check is done).
 	// TContour needs to implement a small sub-set of std::vector<cv::Point>:
 	//     void TContour::emplace_back(int x, int y)
 	//
 	// @param image Single channel 8 bit read access to the image to trace contour in.
+#if !o__THRESHOLD_IS_USED__o //o__#__o//
 	// Pixel with non-zero value are foreground. All other pixels including those outside of image are background.
+#else
+	// Pixel with value above threshold are foreground. All other pixels including those outside of image are background.
+#endif
 	// TImage needs to implement a small sub-set of cv::Mat and expects continuous row-major single 8-bit channel raster image memory:
 	//     int TImage::rows; // number of rows, i.e. image height
 	//     int TImage::cols; // number of columns, i.e. image width
 	//     uint8_t* TImage::ptr(int row, int column) // get pointer to pixel in image at row y and column x; row/column counting starts at zero
 	// 
+#if o__THRESHOLD_IS_USED__o //o__#__o//
+	// @param threshold Pixel bytes higher than this value are considered to be foreground.
+	// 
+#endif
 	// @param x Seed pixel x coordinate.
 	// @param y Seed pixel y coordinate.
 	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
@@ -283,7 +300,7 @@ namespace o__NAMESPACE__o
 	// so if you somehow know that all pixels have been found, you can still use the sign of the return value
 	// to decide if it is an outer or inner contour.
 	template<typename TContour, typename TImage>
-	int findContour(TContour& contour, TImage const& image, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
+	int findContour(TContour& contour, TImage const& image o__THRESHOLD_PARAMETER__o, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
 		o__NAMESPACE__o_Assert(-1 <= dir && dir < 4, "seed direction is invalid");
 
@@ -296,14 +313,65 @@ namespace o__NAMESPACE__o
 		const int stride = height == 1 ? width : int(image.ptr(1, 0) - image_ptr);
 		o__NAMESPACE__o_Assert(width == 1 || height == 1 || image.ptr(0, 1) - image_ptr == 1, (image.ptr(1, 0) - image_ptr == 1 ? "image is not row-major order" : "pixel is not single byte"));
 
-		return findContour(contour, image_ptr, width, height, stride, x, y, dir, clockwise, do_suppress_border, stop);
+		return findContour(contour o__IMAGE_PTR_ARGUMENTS__o, x, y, dir, clockwise, do_suppress_border, stop);
 	}
+#endif o__ONE_BYTE_PER_PIXEL__o
 
+
+#if o__ONE_BYTE_PER_PIXEL__o //o__#__o//
+	// Like findContour above, but with a C-style image.
+#endif
+	// @param image Pointer to image memory, 1 byte per pixel, row-major.
+	// @param width Width of image, i.e. image dimension in x coordinate.
+	// @param height Height of image, i.e. image dimension in y coordinate.
+	// @param stride Stride of image, i.e. offset between start of consecutive rows, i.e. width plus padding bytes at the end of the image line.
+#if !o__THRESHOLD_IS_USED__o //o__#__o//
+	// Pixel with non-zero value are foreground. All other pixels including those outside of image are background.
+#else
+	// @param threshold Threshold to binarize image.
+	// Pixel with value above threshold are foreground. All other pixels including those outside of image are background.
+#endif
+	// 
+	// @param x Seed pixel x coordinate.
+	// @param y Seed pixel y coordinate.
+	// Usually seed pixel (x,y) is taken as the start pixel, but if (x,y) touches the contour only by a corner
+	// (but not by an edge), the start pixel is moved one pixel forward in the given (or automatically chosen) direction
+	// to ensure the resulting contour is consistently 8-connected thin.
+	// The start pixel will be the first pixel in contour, unless it has only contour edges at the image border and do_suppress_border is set.
+	//
+	// @param dir Direction to start contour tracing with. 0 is up, 1 is right, 2 is down, 3 is left.
+	// If value is -1, no direction dir is given and a direction is chosen automatically.
+	// This works well if the seed pixel is part of a single contour only.
+	// If the object to trace is very narrow and the seed pixel is touching the contour on both sides,
+	// the side with the smallest dir is chosen.
+	// Note that a seed pixel can be part of up to four different contours, but no more than one of them can be an outer contour.
+	// So if you expect an outer contour and an outer contour is found, you are good.
+	// Otherwise you need to be more specific.
+	//
+	// @param clockwise Indicates if outer contours are traced clockwise or counterclockwise.
+	// Note that inner contours run in the opposite direction.
+	// If tracing is clockwise, the traced edge is to the left of the current pixel (looking in the current direction),
+	// otherwise the traced edge is to the right.
+	// Set it to false to trace similar to OpenCV cv::findContours.
+	//
+	// @param do_suppress_border Indicates to omit pixels of the contour that are followed on border edges only.
+	// The contour still contains border pixels where it arrives at the image border or where it leaves tha image border,
+	// but not those pixel that only follow the border.
+	//
+	// @param stop Structure to control stop behavior and to return extra information on the state of tracing at the end.
+	//
+	// @return The total difference between left and right turns done during tracing.
+	// If a contour is traced completely, i.e. it is traced until it returns to the start edge,
+	// the value is 4 for an outer contour and -4 if it is an inner contour.
+	// When tracing stops due to stop.max_contour_length the contour is usually not traced completely.
+	// Even if all pixels have been found, up to 3 final edge tracing turns may not have been done,
+	// so if you somehow know that all pixels have been found, you can still use the sign of the return value
+	// to decide if it is an outer or inner contour.
 	template<typename TContour>
-	int findContour(TContour& contour, const uint8_t* const image, const int width, const int height, const int stride, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
+	int findContour(TContour& contour o__IMAGE_PARAMETER__o, int x, int y, int dir = -1, bool clockwise = false, bool do_suppress_border = false, stop_t* stop = NULL)
 	{
 		o__NAMESPACE__o_Assert(0 <= x && x < width && 0 <= y && y < height, "seed pixel is outside of image");
-		o__NAMESPACE__o_Assert(isForeground(x, y, image, width, height, stride), "seed pixel is not foreground");
+		o__NAMESPACE__o_Assert(isForeground(x, y o__IMAGE_ARGUMENTS__o), "seed pixel is not foreground");
 
 		if (dir == -1)
 		{
@@ -350,7 +418,7 @@ namespace o__NAMESPACE__o
 
 			for (dir = 0; dir < 4; dir++)
 			{
-				if (!isLeftForeground(x, y, dir, clockwise, image, width, height, stride))
+				if (!isLeftForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 					break;
 			}
 
@@ -358,7 +426,7 @@ namespace o__NAMESPACE__o
 			{
 				for (dir = 0; dir < 4; dir++)
 				{
-					if (!isLeftForwardForeground(x, y, dir, clockwise, image, width, height, stride))
+					if (!isLeftForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 						break;
 				}
 			}
@@ -366,13 +434,13 @@ namespace o__NAMESPACE__o
 			o__NAMESPACE__o_Assert(dir < 4, "bad seed pixel");
 		}
 
-		if (isLeftForeground(x, y, dir, clockwise, image, width, height, stride) &&
-			isForwardForeground(x, y, dir, clockwise, image, width, height, stride))
+		if (isLeftForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o) &&
+			isForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 		{
 			moveForward(x, y, dir);
 		}
 
-		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise, image, width, height, stride), "bad seed direction");
+		o__NAMESPACE__o_Assert(!isLeftForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o), "bad seed direction");
 
 		const int start_x = x;
 		const int start_y = y;
@@ -381,8 +449,8 @@ namespace o__NAMESPACE__o
 		const bool is_stop_in = stop != NULL && stop->dir >= 0 && stop->dir < 4;
 		if (is_stop_in)
 		{
-			o__NAMESPACE__o_Assert(isForeground(stop->x, stop->y, image, width, height, stride), "stop pixel is not foreground");
-			o__NAMESPACE__o_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise, image, width, height, stride), "stop pixel has bad direction");
+			o__NAMESPACE__o_Assert(isForeground(stop->x, stop->y o__IMAGE_ARGUMENTS__o), "stop pixel is not foreground");
+			o__NAMESPACE__o_Assert(!isLeftForeground(stop->x, stop->y, stop->dir, clockwise o__IMAGE_ARGUMENTS__o), "stop pixel has bad direction");
 		}
 		const int stop_x = is_stop_in ? stop->x : start_x;
 		const int stop_y = is_stop_in ? stop->y : start_y;
@@ -398,7 +466,7 @@ namespace o__NAMESPACE__o
 		// on contour which is inside of the image, i.e. not only edges at image border.
 		// Otherwise it is always true.
 		bool is_pixel_valid = !do_suppress_border ||
-			hasPixelNonBorderEdgeBackwards(x, y, dir, clockwise, image, width, height, stride);
+			hasPixelNonBorderEdgeBackwards(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o);
 
 		if (max_contour_length > 0)
 		{
@@ -445,7 +513,7 @@ namespace o__NAMESPACE__o
 			do
 			{
 				// (rule 1)
-				if (isLeftForwardForeground(x, y, dir, clockwise, image, width, height, stride))
+				if (isLeftForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 				{
 					contour.emplace_back(x, y);
 					moveForward(x, y, dir);
@@ -457,7 +525,7 @@ namespace o__NAMESPACE__o
 					is_pixel_valid = true;
 				}
 				// (rule 2)
-				else if (isForwardForeground(x, y, dir, clockwise, image, width, height, stride))
+				else if (isForwardForeground(x, y, dir, clockwise o__IMAGE_ARGUMENTS__o))
 				{
 					if (is_pixel_valid)
 					{
@@ -481,8 +549,13 @@ namespace o__NAMESPACE__o
 
 #else
 
+#if !o__ONE_BIT_PER_PIXEL__o //o__#__o//
 			// pointer to current pixel
 			const uint8_t* pixel = &image[x + y * stride];
+#else
+			// index of current pixel in image
+			size_t pixel = x + y * stride;
+#endif
 
 			// constants to address 8-connected neighbours of pixel
 			constexpr int off_00 = 0;
