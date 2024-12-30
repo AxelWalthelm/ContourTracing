@@ -5,7 +5,7 @@ from stat import S_IREAD, S_IWUSR
 import Preprocessor
 
 directory = os.path.dirname(os.path.abspath(__file__))
-template_file = os.path.join(directory, "ContourTracingGeneratorTemplate.hpp")
+template_file = os.path.join(directory, "Template.hpp")
 output_file_of_variants = {
 	'bool': 'ContourTracing.hpp',
 	'thresh': 'ContourTracingThresh.hpp',
@@ -66,7 +66,9 @@ warning_generated_code = """
 # WARNING: this code was generated - do not edit, your changes may get lost #
 #############################################################################
 Consider to edit {} and {} instead.
-""".strip('\n').format(os.path.basename(__file__), os.path.basename(template_file))
+""".strip('\n').format(
+		os.path.relpath(__file__,      os.path.dirname(output_file)),
+		os.path.relpath(template_file, os.path.dirname(output_file)))
 
 introduction = """
  Fast Edge-Based Contour Tracing from Seed-Point (FECTS)
@@ -393,8 +395,8 @@ with open(template_file) as f:
 
 template = re.sub(r"\bo__NAMESPACE__o\b", namespace, template)
 template = re.sub(r"\bo__NAMESPACE__o_\B", namespace_, template)  # FECTS_assert etc.
-template = re.sub(r"\bo__WARNING_CODE_IS_GENERATED__o\b", warning_generated_code, template)
-template = re.sub(r"\bo__INTRODUCTION__o\b", introduction, template)
+template = re.sub(r"\bo__WARNING_CODE_IS_GENERATED__o\b", lambda m: warning_generated_code, template)
+template = re.sub(r"\bo__INTRODUCTION__o\b", lambda m: introduction, template)
 lines = template.splitlines()
 
 Preprocessor.Process(lines, ppvars, lambda t: "//o__#__o//" in t, template_file)

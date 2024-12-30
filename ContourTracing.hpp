@@ -7,7 +7,7 @@
 #############################################################################
 # WARNING: this code was generated - do not edit, your changes may get lost #
 #############################################################################
-Consider to edit ContourTracingGenerator.py and ContourTracingGeneratorTemplate.hpp instead.
+Consider to edit Generator\Generator.py and Generator\Template.hpp instead.
 */
 
 #include <stdio.h>
