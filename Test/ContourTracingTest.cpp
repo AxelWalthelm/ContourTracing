@@ -31,9 +31,9 @@ hand/script optimized code is (only) a few percent faster, especially on longer 
 Other processors and architectures may benefit more from optimized code. (ARM, smaller RISC processors, ...?)
 */
 #define FECTS_GENERATOR_OPTIMIZED 1
-#include "ContourTracing.hpp"
+#include "../ContourTracing.hpp"
 
-#include "ContourChainApproxSimple.hpp"
+#include "../ContourChainApproxSimple.hpp"
 
 static bool TEST_failed = false;
 

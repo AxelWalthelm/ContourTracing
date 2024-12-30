@@ -13,15 +13,16 @@ output_file_of_variants = {
 }
 
 variant = (sys.argv[1:2] or ['bool'])[0]
-if len(sys.argv) != 2 or variant not in ('bool', 'thresh', 'bitonic'):
-	print("Usage: ContourTracingGenerator.py variant")
+out_folder = (sys.argv[2:3] or ['.'])[0]
+if len(sys.argv) not in (2, 3) or variant not in ('bool', 'thresh', 'bitonic'):
+	print("Usage: ContourTracingGenerator.py variant [out-folder]")
 	print("Possible values for variant are:")
 	print("  bool: input image is 1 byte per pixel and 0 is background; compatible with OpenCV")
 	print("  thresh: input image is 1 byte per pixel and values <= threshold are background; compatible with OpenCV")
 	print("  bitonic: input image is 1 bit per pixel and 0 is background")
 	exit(-1)
 
-output_file = os.path.join(directory, output_file_of_variants[variant])
+output_file = os.path.abspath(os.path.join(directory, out_folder, output_file_of_variants[variant]))
 
 # pre-pre-preprocessing variables
 ppvars = {

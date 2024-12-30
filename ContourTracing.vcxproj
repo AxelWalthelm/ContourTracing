@@ -114,7 +114,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python ContourTracingGenerator.py bool &amp;&amp; python ContourTracingGenerator.py thresh &amp;&amp; python ContourTracingGenerator.py bitonic</Command>
+      <Command>python Generator\ContourTracingGenerator.py bool .. &amp;&amp; python Generator\ContourTracingGenerator.py thresh .. &amp;&amp; python Generator\ContourTracingGenerator.py bitonic ..</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -158,7 +158,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python ContourTracingGenerator.py bool &amp;&amp; python ContourTracingGenerator.py thresh &amp;&amp; python ContourTracingGenerator.py bitonic</Command>
+      <Command>python Generator\ContourTracingGenerator.py bool .. &amp;&amp; python Generator\ContourTracingGenerator.py thresh .. &amp;&amp; python Generator\ContourTracingGenerator.py bitonic ..</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
