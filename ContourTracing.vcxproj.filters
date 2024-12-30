@@ -10,10 +10,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Test\ContourTracingTest.cpp">
+    <ClCompile Include="Test\HighResolutionTimer.cpp">
       <Filter>Test</Filter>
     </ClCompile>
-    <ClCompile Include="Test\HighResolutionTimer.cpp">
+    <ClCompile Include="Test\Test.cpp">
       <Filter>Test</Filter>
     </ClCompile>
   </ItemGroup>
@@ -26,15 +26,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="Generator\ContourTracingGenerator.py">
+    <CustomBuild Include="Generator\Preprocessor.py">
       <Filter>Generator</Filter>
     </CustomBuild>
-    <CustomBuild Include="Generator\Preprocessor.py">
+    <CustomBuild Include="Generator\Generator.py">
       <Filter>Generator</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Generator\ContourTracingGeneratorTemplate.hpp">
+    <Text Include="Generator\Template.hpp">
       <Filter>Generator</Filter>
     </Text>
   </ItemGroup>
