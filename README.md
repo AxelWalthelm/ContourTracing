@@ -169,6 +169,89 @@ else (rule 3)
 In case of counterclockwise tracing the rules are the same except that left and right are exchanged.
 ```
 
+## Variations
+
+I wanted to quickly try out some variations of the above algorithm. 
+
+Since the contour tracing code
+(especially the parts optimized for each of the possible 4 directions, once for clockwise and once more for counterclockwise)
+generated from Template.hpp via my ad-hoc Python script is error-prone on modifications,
+the generator was extended to also do conditional #if/#else to generate these variations.
+
+### ContourTracing.hpp
+
+This is the original variant as described above.
+
+### ContourTracingThresh.hpp
+
+Quite similar to the above, but has an additional "threshold" parameter to work on OpenCV 8-bit greyscale images.
+Instead of testing pixels for non-zero, each pixel is tested to be larger than threshold.
+
+As expected this slows down contour tracing a few percent,
+but it sure is faster than thresholding the full image first and then doing contour tracing on a few contours.
+
+### ContourTracingBitonal.hpp
+
+OpenCV does not support 1-bit-per-pixel images. They used to exist in the olden days,
+often called **bitmaps** or [**binary** images](https://en.wikipedia.org/wiki/Binary_image).
+Over the years the term bitmap was also used for color images,
+and OpenCV implements black/white binary images using 8-bit-per-pixel.
+Here I will use the term bitonal bitmap image, or **bitonal** for short, to refer to 1-bit-per-pixel images.
+
+I've always wondered why this image format did become unpopular and mostly unsupported.
+Limiting OpenCV to only 7 image formats was probably a conscious design decision at some time.
+The remaining 8th image format was reserved for special uses
+until it was re-assigned to 16-bit floating-point images for neural networks AI.
+Adding more image formats will need a serious re-design of OpenCV.
+
+Bitonal images were left out.
+
+Some decades ago I did some experiments.
+If I recall it correctly it was on Sun Sparc computers with fast RISC processors.
+Surprisingly the result was that bitonal images were seriously slower than working with 1 byte per pixel.
+But since then, processors and compilers did become more powerful.
+And using less memory did become more important to make better use of the cache hierarchy.
+
+Therefore I tried it out with contour tracing.
+It turns out that on Intel Celeron J1900, compiled with full optimization of Visual Studio Community 2015,
+bitonal images are faster. Not by very much, but they are. The tests (see Test.cpp) use rather small images,
+so given the right image size and sufficiently long contours, there will be cases that run significantly faster.
+
+<!--
+```
+FECTS  0 (1): 256331000 ns, 472256 pix, 542 ns/pix
+FECTS  1 (2): 162706600 ns, 339398 pix, 479 ns/pix
+FECTS  2 (7): 475734900 ns, 1249870 pix, 380 ns/pix
+FECTS  3 (20): 437452300 ns, 1741676 pix, 251 ns/pix
+FECTS  4 (54): 296591300 ns, 1881709 pix, 157 ns/pix
+FECTS  5 (148): 87956100 ns, 805567 pix, 109 ns/pix
+FECTS  6 (403): 3941600 ns, 37446 pix, 105 ns/pix 
+time   OpenCV:  2891617300 ns, 6527922 pix, 442 ns/pix
+time    FECTS:  1720713800 ns, 6527922 pix, 263 ns/pix
+time ratio: 0.595
+FECTS_T  0 (1): 265683800 ns, 472256 pix, 562 ns/pix
+FECTS_T  1 (2): 170748300 ns, 339398 pix, 503 ns/pix
+FECTS_T  2 (7): 484521200 ns, 1249870 pix, 387 ns/pix
+FECTS_T  3 (20): 427739500 ns, 1741676 pix, 245 ns/pix
+FECTS_T  4 (54): 289429200 ns, 1881709 pix, 153 ns/pix
+FECTS_T  5 (148): 88328500 ns, 805567 pix, 109 ns/pix
+FECTS_T  6 (403): 3488100 ns, 37446 pix, 93 ns/pix
+time   OpenCV:  2891617300 ns, 6527922 pix, 442 ns/pix
+time  FECTS_T:  1729938600 ns, 6527922 pix, 265 ns/pix
+time ratio: 0.598
+FECTS_B  0 (1): 255495500 ns, 472256 pix, 541 ns/pix
+FECTS_B  1 (2): 169801500 ns, 339398 pix, 500 ns/pix
+FECTS_B  2 (7): 473354900 ns, 1249870 pix, 378 ns/pix
+FECTS_B  3 (20): 425683200 ns, 1741676 pix, 244 ns/pix
+FECTS_B  4 (54): 288123000 ns, 1881709 pix, 153 ns/pix
+FECTS_B  5 (148): 81082900 ns, 805567 pix, 100 ns/pix
+FECTS_B  6 (403): 3133600 ns, 37446 pix, 83 ns/pix
+time   OpenCV:  2891617300 ns, 6527922 pix, 442 ns/pix
+time  FECTS_B:  1696674600 ns, 6527922 pix, 259 ns/pix
+time ratio: 0.587
+TEST OK
+```
+-->
 
 ## Comparison with Theo Pavlidis' Algorithm
 

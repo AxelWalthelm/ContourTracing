@@ -9,27 +9,27 @@ template_file = os.path.join(directory, "Template.hpp")
 output_file_of_variants = {
 	'bool': 'ContourTracing.hpp',
 	'thresh': 'ContourTracingThresh.hpp',
-	'bitonic': 'ContourTracingBitonic.hpp',
+	'bitonal': 'ContourTracingBitonal.hpp',
 }
 
 variant = (sys.argv[1:2] or ['bool'])[0]
 out_folder = (sys.argv[2:3] or ['.'])[0]
-if len(sys.argv) not in (2, 3) or variant not in ('bool', 'thresh', 'bitonic'):
+if len(sys.argv) not in (2, 3) or variant not in ('bool', 'thresh', 'bitonal'):
 	print("Usage: ContourTracingGenerator.py variant [out-folder]")
 	print("Possible values for variant are:")
 	print("  bool: input image is 1 byte per pixel and 0 is background; compatible with OpenCV")
 	print("  thresh: input image is 1 byte per pixel and values <= threshold are background; compatible with OpenCV")
-	print("  bitonic: input image is 1 bit per pixel and 0 is background")
+	print("  bitonal: input image is 1 bit per pixel and 0 is background")
 	exit(-1)
 
 output_file = os.path.abspath(os.path.join(directory, out_folder, output_file_of_variants[variant]))
 
 # pre-pre-preprocessing variables
 ppvars = {
-	'o__ONE_BYTE_PER_PIXEL__o': '1' if variant != 'bitonic' else '0',
-	'o__ONE_BIT_PER_PIXEL__o': '1' if variant == 'bitonic' else '0',
+	'o__ONE_BYTE_PER_PIXEL__o': '1' if variant != 'bitonal' else '0',
+	'o__ONE_BIT_PER_PIXEL__o': '1' if variant == 'bitonal' else '0',
 	'o__THRESHOLD_IS_USED__o': '1' if variant == 'thresh' else '0',
-	'o__THRESHOLD_PARAMETER__o': "##, int threshold" if variant == 'thresh' else "##",
+	'o__THRESHOLD_PARAMETER__o': "##, const int threshold" if variant == 'thresh' else "##",
 	'o__IMAGE_PARAMETER__o': "##, const uint8_t* const image, const int width, const int height, const int stride" + (
 		                     ", const int threshold" if variant == 'thresh' else ""),
 	'o__IMAGE_ARGUMENTS__o': "##, image, width, height, stride" + (
@@ -43,7 +43,7 @@ namespace = "FECTS"
 namespace_ = namespace + "_"
 if variant == 'thresh':
 	namespace += "_T"
-if variant == 'bitonic':
+if variant == 'bitonal':
 	namespace += "_B"
 
 def strip_parentheses(term):
@@ -133,7 +133,7 @@ def pixel_off_code(vec):
 	return "off_" + sign[vec[0]] + sign[vec[1]]
 
 def is_value_foreground_code(value_code):
-	if variant == 'bitonic':
+	if variant == 'bitonal':
 		m = re.match(r"^\s*(\w+)\s*\[(.*)\]\s*$", value_code)
 		array_pointer, array_index = m.groups()
 		if array_pointer == 'image':
@@ -447,8 +447,10 @@ for line_index, line in enumerate(lines):
 
 new_file_content = '\n'.join(lines) + '\n'
 
-with open(output_file) as f:
-	old_file_content = f.read()
+old_file_content = None
+if os.path.isfile(output_file):
+	with open(output_file) as f:
+		old_file_content = f.read()
 
 if new_file_content == old_file_content:
 	print("No changes.")

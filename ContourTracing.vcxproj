@@ -76,12 +76,14 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <CustomBuildBeforeTargets>BuildCompile</CustomBuildBeforeTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <CustomBuildBeforeTargets>BuildCompile</CustomBuildBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -114,8 +116,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python Generator\Generator.py bool .. &amp;&amp; python Generator\Generator.py thresh .. &amp;&amp; python Generator\Generator.py bitonic ..</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>python Generator\Generator.py bool .. &amp;&amp; python Generator\Generator.py thresh .. &amp;&amp; python Generator\Generator.py bitonal ..</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs>ContourTracing.hpp;ContourTracingThresh.hpp;ContourTracingBitonal.hpp;%(Outputs)</Outputs>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Inputs>Generator\Generator.py;Generator\Template.hpp;%(Inputs)</Inputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -158,8 +170,18 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>python Generator\Generator.py bool .. &amp;&amp; python Generator\Generator.py thresh .. &amp;&amp; python Generator\Generator.py bitonic ..</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>python Generator\Generator.py bool .. &amp;&amp; python Generator\Generator.py thresh .. &amp;&amp; python Generator\Generator.py bitonal ..</Command>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Outputs>ContourTracing.hpp;ContourTracingThresh.hpp;ContourTracingBitonal.hpp;%(Outputs)</Outputs>
+    </CustomBuildStep>
+    <CustomBuildStep>
+      <Inputs>Generator\Generator.py;Generator\Template.hpp;%(Inputs)</Inputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Test\Test.cpp" />
@@ -168,8 +190,9 @@
   <ItemGroup>
     <ClInclude Include="ContourChainApproxSimple.hpp" />
     <ClInclude Include="ContourTracing.hpp" />
-    <ClInclude Include="ContourTracingBitonic.hpp" />
+    <ClInclude Include="ContourTracingBitonal.hpp" />
     <ClInclude Include="ContourTracingThresh.hpp" />
+    <ClInclude Include="Test\BitonalImage.hpp" />
     <ClInclude Include="Test\HighResolutionTimer.h" />
     <Text Include="Generator\Template.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

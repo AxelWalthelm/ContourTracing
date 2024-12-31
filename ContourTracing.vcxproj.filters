@@ -3,9 +3,12 @@
   <ItemGroup>
     <ClInclude Include="ContourTracing.hpp" />
     <ClInclude Include="ContourChainApproxSimple.hpp" />
-    <ClInclude Include="ContourTracingBitonic.hpp" />
     <ClInclude Include="ContourTracingThresh.hpp" />
     <ClInclude Include="Test\HighResolutionTimer.h">
+      <Filter>Test</Filter>
+    </ClInclude>
+    <ClInclude Include="ContourTracingBitonal.hpp" />
+    <ClInclude Include="Test\BitonalImage.hpp">
       <Filter>Test</Filter>
     </ClInclude>
   </ItemGroup>

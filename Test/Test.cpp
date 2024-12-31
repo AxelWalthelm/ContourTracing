@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <vector>
+#include "BitonalImage.hpp"
 #include "HighResolutionTimer.h"
 
 #define SAVE_IMAGES 0
@@ -32,6 +33,8 @@ Other processors and architectures may benefit more from optimized code. (ARM, s
 */
 #define FECTS_GENERATOR_OPTIMIZED 1
 #include "../ContourTracing.hpp"
+#include "../ContourTracingThresh.hpp"
+#include "../ContourTracingBitonal.hpp"
 
 #include "../ContourChainApproxSimple.hpp"
 
@@ -317,6 +320,40 @@ double logBinUpperLimit(int bin)
 		return 1.0;
 	return std::exp(double(bin));
 }
+
+
+struct Durations
+{
+	uint64_t bins[logBinsMax] = { 0 };
+	int counts[logBinsMax] = { 0 };
+
+	void add(int bin, uint64_t duration, int count)
+	{
+		bins[bin] += duration;
+		counts[bin] += count;
+	}
+
+	void print(const char* name, const char* name_other, uint64_t duration_other, int count_other)
+	{
+		uint64_t duration = 0;
+		int count = 0;
+		int max_bin = logBinsMax - 1;
+		while (max_bin >= 0 && counts[max_bin] == 0)
+			--max_bin;
+		for (int bin = 0; bin <= max_bin; bin++)
+		{
+			printf("%s  %d (%d): %lld ns, %d pix, %lld ns/pix\n",
+				name,
+				bin, int(logBinUpperLimit(bin)), bins[bin], counts[bin],
+				bins[bin] / std::max(1, counts[bin]));
+			duration += bins[bin];
+			count += counts[bin];
+		}
+		printf("time %8s: %11lld ns, %d pix, %lld ns/pix\n", name_other, duration_other, count_other, duration_other / count_other);
+		printf("time %8s: %11lld ns, %d pix, %lld ns/pix\n", name, duration, count, duration / count);
+		printf("time ratio: %.3f\n", double(duration) / double(duration_other));
+	}
+};
 
 
 int main()
@@ -943,14 +980,20 @@ int main()
 
 	uint64_t duration_OpenCV = 0;
 	int duration_OpenCV_count = 0;
-	uint64_t duration_FECTS_bins[logBinsMax] = { 0 };
-	int duration_FECTS_counts[logBinsMax] = { 0 };
+	Durations duration_FECTS;
+	Durations duration_FECTS_T;
+	Durations duration_FECTS_B;
 
 	for (int test = 0; test < 1000; test++)
 	{
 		printf("test=%d\n", test);
 
 		setRandom(image);
+
+		BitonalImage<> bitonal(image.cols, image.rows, (int)image.step);
+		bitonal.CopyFrom(image.data, image.cols, image.rows, (int)image.step);
+		//bitonal.Print();
+		TEST(bitonal.IsEqual(image.data, image.cols, image.rows, (int)image.step));
 
 #if SAVE_IMAGES
 		cv::imwrite(string_format("C:\\tmp\\test-image-%05d.png", test), image);
@@ -984,8 +1027,7 @@ int main()
 				int bin = logBin(double(expected_contour.size()));
 				timer_start = GetHighResolutionTime();
 				TEST_NO_ERROR(turns = FECTS::findContour(contour, image, start.x, start.y, dir, clockwise, false, test_stop ? &stop : NULL));
-				duration_FECTS_bins[bin] += GetHighResolutionTimeElapsedNs(timer_start);
-				duration_FECTS_counts[bin] += int(expected_contour.size());
+				duration_FECTS.add(bin, GetHighResolutionTimeElapsedNs(timer_start), int(expected_contour.size()));
 
 				TEST(contour.size() == expected_contour.size());
 				for (int i = 0; i < int(expected_contour.size()) && !TEST_failed; i++)
@@ -1011,8 +1053,66 @@ int main()
 					// Examples to generate animated PNG:
 					// ffmpeg.exe -framerate 5 -i image%05d.png -plays 0 -final_delay 2.0 -f apng -lavfi split[v],palettegen,[v]paletteuse out.apng
 					// for /d %d in (C:\tmp\inner-contour-* C:\tmp\outer-contour-*) do ffmpeg.exe -framerate 5 -i %d\image%05d.png -plays 0 -final_delay 2.0 -f apng -lavfi split[v],palettegen,[v]paletteuse %d\..\%~nxd.apng
-			}
+				}
 #endif
+
+				if (TEST_showFailed(image, contour, expected_contour, contour_index))
+					break;
+			}
+
+			// trace from start point - variant "thresh"
+			//////////////////////////////////////////////
+			{
+				cv::Point start = expected_contour[0];
+				int dir = is_outer ? 2 : 0;
+				bool clockwise = false;
+				std::vector<cv::Point> contour;
+				FECTS_T::stop_t stop;
+				bool test_stop = rand_int(1) == 1;
+				int bin = logBin(double(expected_contour.size()));
+				timer_start = GetHighResolutionTime();
+				TEST_NO_ERROR(turns = FECTS_T::findContour(contour, image, 127, start.x, start.y, dir, clockwise, false, test_stop ? &stop : NULL));
+				duration_FECTS_T.add(bin, GetHighResolutionTimeElapsedNs(timer_start), int(expected_contour.size()));
+
+				TEST(contour.size() == expected_contour.size());
+				for (int i = 0; i < int(expected_contour.size()) && !TEST_failed; i++)
+				{
+					TEST(contour[i] == expected_contour[i]);
+					if (TEST_failed)
+						printf("  i=%d\n", i);
+				}
+
+				TEST(stop.max_contour_length == (test_stop ? int(expected_contour.size()) : -1));
+				TEST(turns == (is_outer ? 4 : -4));
+
+				if (TEST_showFailed(image, contour, expected_contour, contour_index))
+					break;
+			}
+
+			// trace from start point - variant "bitonal"
+			//////////////////////////////////////////////
+			{
+				cv::Point start = expected_contour[0];
+				int dir = is_outer ? 2 : 0;
+				bool clockwise = false;
+				std::vector<cv::Point> contour;
+				FECTS_B::stop_t stop;
+				bool test_stop = rand_int(1) == 1;
+				int bin = logBin(double(expected_contour.size()));
+				timer_start = GetHighResolutionTime();
+				TEST_NO_ERROR(turns = FECTS_B::findContour(contour, bitonal.data, bitonal.width, bitonal.height, bitonal.stride, start.x, start.y, dir, clockwise, false, test_stop ? &stop : NULL));
+				duration_FECTS_B.add(bin, GetHighResolutionTimeElapsedNs(timer_start), int(expected_contour.size()));
+
+				TEST(contour.size() == expected_contour.size());
+				for (int i = 0; i < int(expected_contour.size()) && !TEST_failed; i++)
+				{
+					TEST(contour[i] == expected_contour[i]);
+					if (TEST_failed)
+						printf("  i=%d\n", i);
+				}
+
+				TEST(stop.max_contour_length == (test_stop ? int(expected_contour.size()) : -1));
+				TEST(turns == (is_outer ? 4 : -4));
 
 				if (TEST_showFailed(image, contour, expected_contour, contour_index))
 					break;
@@ -1152,22 +1252,7 @@ int main()
 				break;
 		}
 
-		uint64_t duration_FECTS = 0;
-		int duration_FECTS_count = 0;
-		int max_bin = logBinsMax - 1;
-		while (max_bin >= 0 && duration_FECTS_counts[max_bin] == 0)
-			--max_bin;
-		for (int bin = 0; bin <= max_bin; bin++)
-		{
-			printf("  %d (%d): %lld ns, %d pix, %lld ns/pix\n",
-				bin, int(logBinUpperLimit(bin)), duration_FECTS_bins[bin], duration_FECTS_counts[bin],
-				duration_FECTS_bins[bin] / std::max(1, duration_FECTS_counts[bin]));
-			duration_FECTS += duration_FECTS_bins[bin];
-			duration_FECTS_count += duration_FECTS_counts[bin];
-		}
-		printf("time OpenCV: %11lld ns, %d pix, %lld ns/pix\n", duration_OpenCV, duration_OpenCV_count, duration_OpenCV / duration_OpenCV_count);
-		printf("time FECTS:  %11lld ns, %d pix, %lld ns/pix\n", duration_FECTS, duration_FECTS_count, duration_FECTS / duration_FECTS_count);
-		printf("time ratio: %.3f\n", double(duration_FECTS) / double(duration_OpenCV));
+		duration_FECTS.print("FECTS", "OpenCV", duration_OpenCV, duration_OpenCV_count);
 
 		// Speed test on "Intel(R) Celeron(R) CPU J1900 1.99GHz" using OpenCV 4.3.0 without GPU and compiled with Visual Studio Community 2015:
 		/*
@@ -1183,6 +1268,9 @@ int main()
 			time FECTS:   1983026200 ns, 9594334 pix, 206 ns/pix
 			time ratio: 0.638
 		*/
+
+		duration_FECTS_T.print("FECTS_T", "OpenCV", duration_OpenCV, duration_OpenCV_count);
+		duration_FECTS_B.print("FECTS_B", "OpenCV", duration_OpenCV, duration_OpenCV_count);
 
 		if (TEST_failed)
 			break;

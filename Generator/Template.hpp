@@ -125,6 +125,32 @@ namespace o__NAMESPACE__o
 		}
 #define o__NAMESPACE__o_Assert(expr,msg) do { if(!!(expr)) ; else defaultErrorHandler(#expr, (msg), __func__, __FILE__, __LINE__ ); } while(0)
 #endif
+#if o__ONE_BIT_PER_PIXEL__o //o__#__o//
+
+		static inline
+		bool bittest(uint8_t const *bits, int32_t bit_index)
+		{
+			return (bits[bit_index >> 3] & (uint8_t)(1 << (bit_index & 7))) != 0;
+		}
+
+		static inline
+		bool bittest(uint8_t const *bits, uint32_t bit_index)
+		{
+			return (bits[bit_index >> 3] & (uint8_t)(1 << (bit_index & 7))) != 0;
+		}
+
+		static inline
+		bool bittest(uint8_t const *bits, int64_t bit_index)
+		{
+			return (bits[bit_index >> 3] & (uint8_t)(1 << (bit_index & 7))) != 0;
+		}
+
+		static inline
+		bool bittest(uint8_t const *bits, uint64_t bit_index)
+		{
+			return (bits[bit_index >> 3] & (uint8_t)(1 << (bit_index & 7))) != 0;
+		}
+#endif
 
 		constexpr int dx[] = {0, 1, 0, -1};
 		constexpr int dy[] = {-1, 0, 1, 0};
